@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Empréstimo Celular</title>
+    <link rel="stylesheet" href="../css/styles.css" />
+    <link rel="stylesheet" href="../css/emp_cel.css" />
+</head>
+<body>
+    <!-- Header principal -->
+    <header class="site-header">
+        <a href="index.html" class="logo" aria-label="Voltar para a página inicial">
+            LabTec
+        </a>
+
+        <button class="nav-toggle" aria-expanded="false" aria-controls="site-menu">
+            <span class="sr-only">Abrir menu</span>
+            ☰
+        </button>
+
+        <nav id="site-menu" class="site-nav" aria-label="Navegação principal">
+            <a href="../index.html">Início</a>
+            <a href="emp_note.html">Empréstimo de Notebook</a>
+            <a href="emp_cel.html">Empréstimo de Celulares</a>
+            <a href="emp_cam.html">Empréstimo de Câmera Fotográfica</a>
+        </nav>
+    </header>
+
+    <main id="conteudo" class="painel-notebooks">
+        <div class="status-resumo">
+        <span class="badge-resumo"><span class="dot livre"></span><span id="resumo-cel">–</span></span>
+        </div>
+
+        <div id="legenda-cel" class="legenda" aria-live="polite">
+        <span class="dot livre"></span> Livre
+        <span class="dot ocupado"></span> Ocupado
+        </div>
+
+        <table id="tabela-celulares" class="tabela-notebooks" aria-describedby="legenda-cel">
+        <tbody></tbody>
+        </table>
+    </main>
+
+    <script src="../js/emp_cel.js"></script>
+    <script src="nav.js" defer></script>
+</body>
+</html>

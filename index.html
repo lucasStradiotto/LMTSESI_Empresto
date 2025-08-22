@@ -4,10 +4,74 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Empréstimos LMT - SESI CE 308</title>
+    <link rel="stylesheet" href="./css/styles.css" />
+    <link rel="stylesheet" href="./css/index.css" />
 </head>
 <body>
-    <h1>Empréstimos</h1>
+    <!-- Header principal -->
+    <header class="site-header">
+        <a href="index.html" class="logo" aria-label="Voltar para a página inicial">
+            LabTec
+        </a>
 
-    
+        <button class="nav-toggle" aria-expanded="false" aria-controls="site-menu">
+            <span class="sr-only">Abrir menu</span>
+            ☰
+        </button>
+
+        <nav id="site-menu" class="site-nav" aria-label="Navegação principal">
+            <a href="./index.html">Início</a>
+            <a href="./views/emp_note.html">Empréstimo de Notebook</a>
+            <a href="./views/emp_cel.html">Empréstimo de Celulares</a>
+            <a href="./views/emp_cam.html">Empréstimo de Câmera Fotográfica</a>
+        </nav>
+    </header>
+    <br>
+    <br>
+    <main>
+        <section class="cards-grid">
+        <!-- Notebooks -->
+        <a class="card-emprestimo card--note" href="views/emp_note.html" aria-label="Ir para empréstimo de notebooks">
+            <img class="card-icon" src="./img/notebook.png" alt="" aria-hidden="true" />
+            <div class="card-text">
+            <h3>Notebooks</h3>
+            <p>Empréstimo de notebooks do laboratório.</p>
+            <div class="card-meta">
+                <span class="badge" id="badge-note">–</span>
+                <span class="cta">Emprestar</span>
+            </div>
+            </div>
+        </a>
+
+        <!-- Celulares -->
+        <a class="card-emprestimo card--cel" href="views/emp_cel.html" aria-label="Ir para empréstimo de celulares">
+            <img class="card-icon" src="./img/phone.png" alt="" aria-hidden="true" />
+            <div class="card-text">
+            <h3>Celulares</h3>
+            <p>Empréstimo de celulares para atividades pedagógicas.</p>
+            <div class="card-meta">
+                <span class="badge" id="badge-cel">–</span>
+                <span class="cta">Emprestar</span>
+            </div>
+            </div>
+        </a>
+
+        <!-- Câmeras -->
+        <a class="card-emprestimo card--cam" href="views/emp_cam.html" aria-label="Ir para empréstimo de câmeras fotográficas">
+            <img class="card-icon" src="./img/camera.png" alt="" aria-hidden="true" />
+            <div class="card-text">
+            <h3>Câmeras</h3>
+            <p>Empréstimo de câmeras fotográficas.</p>
+            <div class="card-meta">
+                <span class="badge" id="badge-cam">–</span>
+                <span class="cta">Emprestar</span>
+            </div>
+            </div>
+        </a>
+        </section>
+    </main>
+    <!-- no final do body da HOME -->
+    <script src="./js/index.js" defer></script>
+    <script src="nav.js" defer></script>
 </body>
 </html>
