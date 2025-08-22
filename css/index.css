@@ -43,3 +43,9 @@
   .card-emprestimo{ padding:14px }
   .card-icon{ width:36px; height:36px }
 }
+
+/* Espaçamento da barra de ações da Home */
+.home-toolbar{
+  display:flex; justify-content:flex-end; gap:10px;
+  margin-top:14px; margin-bottom:10px;
+}

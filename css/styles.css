@@ -20,6 +20,9 @@ body{
   color:var(--text); background:#fff;
 }
 .painel-notebooks{ max-width:1100px; margin:24px auto; padding:0 16px; }
+main {
+  margin: 0 100px;
+}
 
 /* ====== HEADER ====== */
 .site-header{
@@ -98,3 +101,18 @@ body{
   .tabela-notebooks td{ padding:6px }
   .notebook{ padding:12px }
 }
+
+/* ===== Botões ===== */
+.btn{
+  display:inline-flex; align-items:center; gap:8px;
+  padding:8px 12px; border-radius:10px; font-weight:700; font-size:.92rem;
+  cursor:pointer; transition:background .15s, color .15s, border-color .15s, box-shadow .15s;
+}
+.btn:focus-visible{ outline:3px solid #2563eb; outline-offset:3px }
+.btn-outline{
+  background:#fff; color:#0f172a; border:1px solid #e5e7eb;
+}
+.btn-outline:hover{
+  border-color:#cbd5e1; box-shadow:0 6px 16px rgba(0,0,0,.08);
+}
+
