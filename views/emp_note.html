@@ -36,6 +36,7 @@
       <div id="legenda-notebooks" class="legenda" aria-live="polite">
         <span class="dot livre"></span> Livre
         <span class="dot ocupado"></span> Ocupado
+        <span class="dot manutencao"></span> Em manutenção
       </div>
 
       <table id="tabela-notebooks" class="tabela-notebooks" aria-describedby="legenda-notebooks">
@@ -45,9 +46,15 @@
 
     <div class="status-resumo">
       <span class="badge-resumo"><span class="dot livre"></span><span id="resumo-note">–</span></span>
-      <button type="button" class="btn btn-outline" id="export-note">Exportar CSV</button>
-    </div>
 
+      <!-- NOVO: baixar modelo simples -->
+      <button type="button" class="btn btn-outline" id="download-modelo-note">Baixar modelo (CSV)</button>
+
+      <button type="button" class="btn btn-outline" id="export-note">Exportar CSV</button>
+
+      <input type="file" accept=".csv" id="import-note-file" class="sr-only" />
+      <button type="button" class="btn btn-outline" id="import-note">Importar CSV</button>
+    </div>
 
 
   <script src="/js/emp_note.js" defer></script>

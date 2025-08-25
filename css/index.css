@@ -49,3 +49,54 @@
   display:flex; justify-content:flex-end; gap:10px;
   margin-top:14px; margin-bottom:10px;
 }
+
+.home-toolbar{
+  display:flex; flex-wrap:wrap; align-items:center; gap:10px;
+  margin-top:14px; margin-bottom:10px;
+}
+
+/* Grade dos botões-ação (mesma lógica dos cards) */
+.actions-grid{
+  display:grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap:16px;
+  margin:20px 0;
+}
+
+/* Card-ação: visual idêntico ao card-emprestimo, mas é <button> */
+.card-acao{
+  all:unset;                /* reseta estilo de botão nativo */
+  display:flex; align-items:center; gap:14px;
+  padding:16px;
+  border:2px solid #e5e7eb; border-radius:16px;
+  background:#fff; color:#0f172a;
+  box-shadow:0 1px 2px rgba(0,0,0,.05);
+  cursor:pointer;
+  transition: transform .15s, box-shadow .15s, border-color .15s, background .15s;
+}
+.card-acao:hover{ transform:translateY(-2px); box-shadow:0 10px 24px rgba(15,23,42,.10) }
+.card-acao:focus-visible{ outline:3px solid #2563eb; outline-offset:3px }
+.card-acao .card-icon{ width:42px; height:42px; object-fit:contain; flex:0 0 auto }
+.card-acao .card-text h3{ margin:0 0 4px; font-size:1.12rem; line-height:1.2; font-weight:800 }
+.card-acao .card-text p{ margin:0; font-size:.95rem; color:#475569 }
+
+/* Cores dos botões-ação */
+.card--emp{ background:#ecfdf5; border-color:#10b981 }
+.card--emp h3{ color:#065f46 }
+
+.card--dev{ background:#f1f5f9; border-color:#94a3b8 } /* neutro elegante */
+.card--dev h3{ color:#0f172a }
+
+@media (max-width:520px){
+  .card-acao{ padding:14px }
+  .card-acao .card-icon{ width:36px; height:36px }
+}
+
+/* Grid de checkboxes no passo de itens */
+.checks-grid{
+  display:grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap:8px;
+  margin-top:4px;
+}
+.checks-grid .toggle{ justify-content:flex-start; }

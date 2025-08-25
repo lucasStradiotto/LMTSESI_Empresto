@@ -29,23 +29,52 @@
     <br>
     <br>
     <main>
-        <!-- Toolbar da Home -->
-        <section class="home-toolbar">
-            <button type="button" class="btn btn-outline" id="export-resumo">
-                Exportar resumo (CSV)
-            </button>
+        <!-- Ações principais -->
+        <section class="actions-grid">
+        <!-- Emprestar -->
+        <button type="button" class="card-acao card--emp" id="abrir-emprestar" aria-label="Abrir formulário de empréstimo">
+            <img class="card-icon" src="assets/icons/form-emprestar.png" alt="" aria-hidden="true" />
+            <div class="card-text">
+            <h3>Emprestar</h3>
+            <p>Registrar retirada de itens por usuário.</p>
+            </div>
+        </button>
+
+        <!-- Devolver -->
+        <button type="button" class="card-acao card--dev" id="abrir-devolver" aria-label="Abrir formulário de devolução">
+            <img class="card-icon" src="assets/icons/form-devolver.png" alt="" aria-hidden="true" />
+            <div class="card-text">
+            <h3>Devolver</h3>
+            <p>Registrar devolução e liberar os itens.</p>
+            </div>
+        </button>
         </section>
+
+        <section class="home-toolbar">
+            <button type="button" class="btn btn-outline" id="export-resumo">Exportar resumo (CSV)</button>
+            <button type="button" class="btn btn-outline" id="download-modelo-resumo">Baixar modelo (CSV)</button>
+            <input type="file" accept=".csv" id="import-resumo-file" class="sr-only" />
+            <button type="button" class="btn btn-outline" id="import-resumo">Importar resumo (CSV)</button>
+
+            <!-- NOVO: Filtro -->
+            <label class="toggle" style="margin-left:auto;">
+                <input type="checkbox" id="toggle-only-manut" />
+                Mostrar apenas categorias com itens em manutenção
+            </label>
+        </section>
+
         <section class="cards-grid">
         <!-- Notebooks -->
         <a class="card-emprestimo card--note" href="views/emp_note.html" aria-label="Ir para empréstimo de notebooks">
             <img class="card-icon" src="./assets/icons/notebook.png" alt="" aria-hidden="true" />
             <div class="card-text">
-            <h3>Notebooks</h3>
-            <p>Empréstimo de notebooks do laboratório.</p>
-            <div class="card-meta">
-                <span class="badge" id="badge-note">–</span>
-                <span class="cta">Emprestar</span>
-            </div>
+                <h3>Notebooks</h3>
+                <p>Empréstimo de notebooks do laboratório.</p>
+                <div class="card-meta">
+                    <span class="badge" id="badge-note">–</span>
+                    <span class="badge-warn" id="manu-note">Em manutenção: –</span>
+                    <span class="cta">Emprestar</span>
+                </div>
             </div>
         </a>
 
@@ -53,12 +82,13 @@
         <a class="card-emprestimo card--cel" href="views/emp_cel.html" aria-label="Ir para empréstimo de celulares">
             <img class="card-icon" src="./assets/icons/celular.png" alt="" aria-hidden="true" />
             <div class="card-text">
-            <h3>Celulares</h3>
-            <p>Empréstimo de celulares para atividades pedagógicas.</p>
-            <div class="card-meta">
-                <span class="badge" id="badge-cel">–</span>
-                <span class="cta">Emprestar</span>
-            </div>
+                <h3>Celulares</h3>
+                <p>Empréstimo de celulares para atividades pedagógicas.</p>
+                <div class="card-meta">
+                    <span class="badge" id="badge-cel">–</span>
+                    <span class="badge-warn" id="manu-cel">Em manutenção: –</span>
+                    <span class="cta">Emprestar</span>
+                </div>
             </div>
         </a>
 
@@ -66,12 +96,13 @@
         <a class="card-emprestimo card--cam" href="views/emp_cam.html" aria-label="Ir para empréstimo de câmeras fotográficas">
             <img class="card-icon" src="./assets/icons/camera.png" alt="" aria-hidden="true" />
             <div class="card-text">
-            <h3>Câmeras</h3>
-            <p>Empréstimo de câmeras fotográficas.</p>
-            <div class="card-meta">
-                <span class="badge" id="badge-cam">–</span>
-                <span class="cta">Emprestar</span>
-            </div>
+                <h3>Câmeras</h3>
+                <p>Empréstimo de câmeras fotográficas.</p>
+                <div class="card-meta">
+                    <span class="badge" id="badge-cam">–</span>
+                    <span class="badge-warn" id="manu-cam">Em manutenção: –</span>
+                    <span class="cta">Emprestar</span>
+                </div>
             </div>
         </a>
         </section>

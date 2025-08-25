@@ -33,9 +33,11 @@
         </div>
 
         <div id="legenda-cam" class="legenda" aria-live="polite">
-        <span class="dot livre"></span> Livre
-        <span class="dot ocupado"></span> Ocupado
+            <span class="dot livre"></span> Livre
+            <span class="dot ocupado"></span> Ocupado
+            <span class="dot manutencao"></span> Em manutenção
         </div>
+
 
         <table id="tabela-cameras" class="tabela-notebooks" aria-describedby="legenda-cam">
         <tbody></tbody>
@@ -44,7 +46,14 @@
 
     <div class="status-resumo">
         <span class="badge-resumo"><span class="dot livre"></span><span id="resumo-cam">–</span></span>
+
+        <!-- NOVO -->
+        <button type="button" class="btn btn-outline" id="download-modelo-cam">Baixar modelo (CSV)</button>
+
         <button type="button" class="btn btn-outline" id="export-cam">Exportar CSV</button>
+
+        <input type="file" accept=".csv" id="import-cam-file" class="sr-only" />
+        <button type="button" class="btn btn-outline" id="import-cam">Importar CSV</button>
     </div>
 
     

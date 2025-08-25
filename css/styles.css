@@ -116,3 +116,87 @@ main {
   border-color:#cbd5e1; box-shadow:0 6px 16px rgba(0,0,0,.08);
 }
 
+/* ===== Estado: Manutenção (vermelho) ===== */
+:root{
+  --manut-bg:#fee2e2;     /* vermelho clarinho */
+  --manut-border:#ef4444; /* vermelho */
+  --manut-text:#7f1d1d;   /* vermelho escuro */
+}
+.notebook.manutencao{
+  background:var(--manut-bg);
+  border-color:var(--manut-border);
+  color:var(--manut-text);
+}
+
+/* Wrapper da célula para posicionar o botão de manutenção */
+.cell{ position: relative; }
+
+/* Botão de manutenção (canto superior direito) */
+.btn-maint{
+  position:absolute; top:6px; right:6px;
+  width:28px; height:28px; padding:0;
+  display:inline-grid; place-items:center;
+  border:1px solid var(--border); background:#fff; border-radius:999px;
+  cursor:pointer; box-shadow:0 1px 2px rgba(0,0,0,.05);
+}
+.btn-maint:hover{ box-shadow:0 6px 16px rgba(0,0,0,.08); }
+.btn-maint img{ width:16px; height:16px; object-fit:contain; display:block }
+
+/* Backdrop ocupa a tela toda; rolagem se o conteúdo estourar */
+.modal-backdrop{
+  position: fixed;
+  inset: 0;
+  background: rgba(15,23,42,.45);
+  display: none;
+  z-index: 100;
+}
+
+/* Mostrar quando abrir */
+.modal-backdrop.open{ display: block; }
+
+/* Modal fixo no topo, centralizado na horizontal.
+   Ganha rolagem interna se passar da altura da viewport. */
+.modal{
+  position: fixed;
+  top: 50px;                /* grudadinho no topo */
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(92vw, 560px);         /* ajuste se quiser mais largo/estreito */
+  max-height: 90vh;               /* nunca passa da viewport */
+  overflow-y: auto;                /* rolagem interna */
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 20px 40px rgba(0,0,0,.18);
+}
+
+/* Evita a página ao fundo rolar quando o modal estiver aberto */
+body.modal-open{ overflow: hidden; }
+
+.modal h3{ margin:0 0 6px; font-size:1.05rem; }
+.modal p{ margin:0 0 12px; color:#475569; font-size:.95rem; }
+.modal-actions{ display:flex; justify-content:flex-end; gap:8px; }
+.btn-danger{ background:#ef4444; color:#fff; border:1px solid #ef4444; }
+.btn-danger:hover{ filter:brightness(0.95); }
+
+/* Dot extra da legenda */
+.dot.manutencao{ background: var(--manut-bg); }
+
+/* Badge vermelha (Home) */
+.badge-warn{
+  display:inline-flex; align-items:center; gap:6px;
+  font-weight:700; font-size:.9rem;
+  padding:6px 10px; border-radius:999px;
+  background: #fef2f2;           /* red-50 */
+  border: 1px solid #fecaca;     /* red-200 */
+  color: #7f1d1d;                /* red-900 */
+}
+
+/* Toggle da Home (opcional, só estética) */
+.toggle{
+  display:inline-flex; align-items:center; gap:8px;
+  padding:6px 10px; border:1px solid var(--border); border-radius:10px;
+  background:#fff; font-weight:600; cursor:pointer;
+}
+.toggle input{ accent-color:#ef4444; transform:translateY(1px); }
