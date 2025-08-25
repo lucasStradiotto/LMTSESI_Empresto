@@ -315,6 +315,201 @@
     selectEl.disabled = nums.length === 0;
   }
 
+  function formatDateTimeBr(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    const p = n => String(n).padStart(2, '0');
+    return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  }
+
+  // Gera e baixa o PDF do empréstimo (com logo e QR code do hash)
+  async function generateLoanPDF(mov) {
+    const wjspdf = window.jspdf;
+    if (!wjspdf || !wjspdf.jsPDF) {
+      alert('Não foi possível gerar o PDF (jsPDF não carregado).');
+      return;
+    }
+    const { jsPDF } = wjspdf;
+    const doc = new jsPDF({ unit: 'pt', format: 'a4' }); // A4
+
+    const tipoSing = (mov.recurso === 'notebooks') ? 'Notebook' :
+      (mov.recurso === 'celulares') ? 'Celular' : 'Câmera';
+    const safe = v => (v == null ? '' : String(v));
+
+    // 1) Cabeçalho com LOGO (se existir)
+    let yPos = 40;
+    // tenta carregar logo
+    const logo = await loadLogoDataURL('../assets/icons/logo.png', 140, 60);
+    if (logo) {
+      // posiciona no topo-direito
+      const xRight = 555; // margem dir ~40 (página ~595pt) => 595-40=555
+      doc.addImage(logo.dataURL, 'PNG', xRight - logo.w, yPos - 20, logo.w, logo.h);
+    }
+
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(16);
+    doc.text('Comprovante de Empréstimo', 40, yPos);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
+    doc.text(`Data do registro: ${formatDateTimeBr(mov.at)}`, 40, yPos + 16);
+
+    // Linha separadora
+    yPos += 28;
+    doc.setDrawColor(229, 231, 235); doc.line(40, yPos, 555, yPos);
+
+    // 2) Dados do Solicitante
+    yPos += 22;
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
+    doc.text('Dados do Solicitante', 40, yPos);
+
+    const addLine = (label, value, x = 40, yInc = 18) => {
+      if (!value) return;
+      yPos += yInc;
+      doc.setFont('helvetica', 'bold'); doc.text(`${label}:`, x, yPos);
+      doc.setFont('helvetica', 'normal'); doc.text(safe(value), x + 120, yPos);
+    };
+
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(11);
+    addLine('Categoria', mov.categoria);
+    addLine('Nome', mov.nome);
+    if (mov.categoria === 'aluno') {
+      addLine('Turma', mov.turma);
+      addLine('Atividade', mov.atividade);
+    }
+    if (mov.categoria === 'professor') {
+      addLine('Disciplina', mov.disciplina);
+      addLine('Turma', mov.turma);
+      addLine('Atividade', mov.atividade);
+      addLine('E-mail', mov.email);
+    }
+    if (mov.categoria === 'colaborador') {
+      addLine('Cargo/Setor', mov.cargoSetor);
+      addLine('Turma', mov.turma);
+      addLine('Atividade', mov.atividade);
+      addLine('E-mail', mov.email);
+    }
+
+    // Observações
+    if (safe(mov.obs)) {
+      yPos += 22;
+      doc.setFont('helvetica', 'bold'); doc.text('Observações:', 40, yPos);
+      doc.setFont('helvetica', 'normal');
+      const maxW = 515; // 555 - 40
+      const lines = doc.splitTextToSize(safe(mov.obs), maxW);
+      yPos += 16;
+      lines.forEach(line => { doc.text(line, 40, yPos); yPos += 14; });
+      yPos -= 6;
+    }
+
+    // 3) Tabela de Itens
+    yPos += 20;
+    if (doc.autoTable) {
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
+      doc.text('Itens Emprestados', 40, yPos);
+      doc.autoTable({
+        startY: yPos + 8,
+        styles: { font: 'helvetica', fontSize: 10, cellPadding: 6 },
+        headStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42] },
+        head: [['Recurso', 'Número', 'Rótulo']],
+        body: (mov.itens || []).map(n => [tipoSing, n, `${tipoSing} ${n}`]),
+        margin: { left: 40, right: 40 }
+      });
+      yPos = doc.lastAutoTable.finalY || (yPos + 30);
+    } else {
+      doc.setFont('helvetica', 'bold'); doc.text('Itens Emprestados', 40, yPos);
+      yPos += 16; doc.setFont('helvetica', 'bold');
+      doc.text('Recurso', 40, yPos); doc.text('Número', 200, yPos); doc.text('Rótulo', 280, yPos);
+      doc.setFont('helvetica', 'normal');
+      (mov.itens || []).forEach(n => { yPos += 16; doc.text(tipoSing, 40, yPos); doc.text(String(n), 200, yPos); doc.text(`${tipoSing} ${n}`, 280, yPos); });
+    }
+
+    // 4) QR Code com hash do registro
+    // Canonicaliza a carga para hash (somente campos relevantes)
+    const payload = {
+      at: mov.at, cat: mov.categoria, nome: mov.nome, rec: mov.recurso, itens: mov.itens,
+      turma: mov.turma || '', disc: mov.disciplina || '', ativ: mov.atividade || '',
+      cargo: mov.cargoSetor || '', email: mov.email || ''
+    };
+    const canonical = JSON.stringify(payload);
+    const hash = await sha256Hex(canonical);
+    const qrText = `EMPRESTIMO:${hash}`;
+    let qrDataURL = null;
+    try {
+      if (window.QRCode?.toDataURL) {
+        qrDataURL = await window.QRCode.toDataURL(qrText, { errorCorrectionLevel: 'M', margin: 1, width: 140 });
+      }
+    } catch (e) { /* ignora e segue sem QR */ }
+
+    // Assinaturas + QR
+    yPos += 30;
+    const signY = Math.min(yPos, 720);
+    doc.setDrawColor(0, 0, 0);
+    // linhas de assinatura
+    doc.line(60, signY, 260, signY);
+    doc.text('Assinatura do Solicitante', 60, signY + 14);
+    doc.line(340, signY, 540, signY);
+    doc.text('Assinatura do Responsável', 340, signY + 14);
+
+    // QR no canto inferior direito
+    if (qrDataURL) {
+      const qrSize = 110;
+      const qrX = 555 - qrSize; // margem dir
+      const qrY = signY - qrSize - 10;
+      doc.addImage(qrDataURL, 'PNG', qrX, qrY, qrSize, qrSize);
+      doc.setFontSize(9); doc.setTextColor(80);
+      doc.text(`Hash: ${hash.slice(0, 16)}…`, qrX, qrY + qrSize + 12);
+    }
+
+    // Rodapé
+    doc.setFontSize(9); doc.setTextColor(100);
+    doc.text('Gerado automaticamente pelo sistema de empréstimos', 40, 810);
+
+    // Nome do arquivo
+    const d = mov.at ? new Date(mov.at) : new Date();
+    const p2 = n => String(n).padStart(2, '0');
+    const fname = `comprovante_emprestimo_${tipoSing.toLowerCase()}_${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}_${p2(d.getHours())}-${p2(d.getMinutes())}.pdf`;
+
+    doc.save(fname);
+  }
+
+
+  function formatDateTimeBr(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    const p = n => String(n).padStart(2, '0');
+    return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  }
+
+  // Hash SHA-256 em hex (fallback simples se WebCrypto indisponível)
+  async function sha256Hex(text) {
+    if (crypto?.subtle) {
+      const data = new TextEncoder().encode(text);
+      const buf = await crypto.subtle.digest('SHA-256', data);
+      return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+    // fallback FNV-1a (não-criptográfico; só pra não quebrar)
+    let h = 0x811c9dc5;
+    for (let i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0; }
+    return ('00000000' + h.toString(16)).slice(-8);
+  }
+
+  // Carrega e redimensiona a logo para DataURL (mantendo proporção)
+  function loadLogoDataURL(url, maxW = 140, maxH = 60) {
+    return new Promise(resolve => {
+      const img = new Image();
+      img.onload = () => {
+        const { naturalWidth: w, naturalHeight: h } = img;
+        const ratio = Math.min(maxW / w, maxH / h, 1);
+        const cw = Math.round(w * ratio), ch = Math.round(h * ratio);
+        const c = document.createElement('canvas');
+        c.width = cw; c.height = ch;
+        const ctx = c.getContext('2d');
+        ctx.drawImage(img, 0, 0, cw, ch);
+        resolve({ dataURL: c.toDataURL('image/png'), w: cw, h: ch });
+      };
+      img.onerror = () => resolve(null);
+      img.src = url;
+    });
+  }
+
   /* ---- Modal: Emprestar (WIZARD) ---- */
   BTN_ABRIR_EMP?.addEventListener('click', () => {
     // estado do wizard
@@ -541,6 +736,41 @@
       updateButtons();
     }
 
+    // Gera e baixa um CSV com todas as informações do empréstimo atual
+    function downloadLoanCSV(mov) {
+      const tipoSing = (mov.recurso === 'notebooks') ? 'Notebook' :
+        (mov.recurso === 'celulares') ? 'Celular' : 'Câmera';
+
+      const header = [
+        'recurso', 'numero', 'rotulo',
+        'categoria', 'nome', 'cargo_setor', 'turma', 'disciplina', 'atividade', 'email',
+        'obs', 'data_form'
+      ];
+
+      const rows = (mov.itens || []).map((n) => ([
+        tipoSing.toLowerCase(),
+        n,
+        `${tipoSing} ${n}`,
+        mov.categoria || '',
+        mov.nome || '',
+        mov.cargoSetor || '',
+        mov.turma || '',
+        mov.disciplina || '',
+        mov.atividade || '',
+        mov.email || '',
+        mov.obs || '',
+        (typeof formatDateTime === 'function') ? formatDateTime(mov.at) : mov.at
+      ]));
+
+      const at = mov.at ? new Date(mov.at) : new Date();
+      const pad = (x) => String(x).padStart(2, '0');
+      const fname = `emprestimo_${tipoSing.toLowerCase()}_${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}_${pad(at.getHours())}-${pad(at.getMinutes())}.csv`;
+
+      // usa a mesma util do export geral (downloadCSV(filename, header[], rows[][]))
+      downloadCSV(fname, header, rows);
+    }
+
+
     async function finalize() {
       const occ = (state.tipo === 'notebooks') ? nbOcc : (state.tipo === 'celulares') ? ceOcc : caOcc;
       const man = (state.tipo === 'notebooks') ? nbMan : (state.tipo === 'celulares') ? ceMan : caMan;
@@ -586,6 +816,32 @@
         const movimentos = JSON.parse(localStorage.getItem('registros_movimentos') || '[]');
         movimentos.push(movBase);
         localStorage.setItem('registros_movimentos', JSON.stringify(movimentos));
+        async function enviarEmprestimoAoBackend(movBase) {
+          const resp = await fetch('/api_loan.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              recurso: movBase.recurso,       // notebooks|celulares|cameras
+              codigos: movBase.itens,         // [1,2,3]
+              form: {
+                categoria: movBase.categoria,
+                nome: movBase.nome,
+                turma: movBase.turma || '',
+                disciplina: movBase.disciplina || '',
+                atividade: movBase.atividade || '',
+                cargoSetor: movBase.cargoSetor || '',
+                email: movBase.email || '',
+                obs: movBase.obs || ''
+              }
+            })
+          });
+          const data = await resp.json();
+          if (!data.ok) throw new Error(data.error || 'Falha no empréstimo');
+          return data; // { emprestados:[], ocupados:[], manutencao:[], inexistentes:[] }
+        }
+
+        await generateLoanPDF(movBase);   // gera e baixa o PDF com logo + QR
+
       }
 
       renderBadges(); applyFilter();
