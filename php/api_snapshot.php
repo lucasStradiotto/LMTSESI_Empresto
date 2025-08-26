@@ -10,12 +10,24 @@ function counts(PDO $pdo, string $table){
           FROM `$table`";
   return $pdo->query($sql)->fetch();
 }
+function items(PDO $pdo, string $table){
+  $stmt = $pdo->query("SELECT id,codigo,patrimonio,status,manutencao,updated_at FROM `$table` ORDER BY codigo ASC");
+  return $stmt->fetchAll();
+}
+
 try{
   echo json_encode([
     'ok'=>true,
-    'notebooks'=>counts($pdo,'notebook'),
-    'celulares'=>counts($pdo,'celular'),
-    'cameras'  =>counts($pdo,'camera'),
+    'counts'=>[
+      'notebooks'=>counts($pdo,'notebook'),
+      'celulares'=>counts($pdo,'celular'),
+      'cameras'  =>counts($pdo,'camera'),
+    ],
+    'items'=>[
+      'notebooks'=>items($pdo,'notebook'),
+      'celulares'=>items($pdo,'celular'),
+      'cameras'  =>items($pdo,'camera'),
+    ],
   ], JSON_UNESCAPED_UNICODE);
 }catch(Throwable $e){
   http_response_code(400);

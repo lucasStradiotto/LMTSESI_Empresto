@@ -1,5 +1,2 @@
-@import url("../styles.css");
-:root{
-  --livre-bg:#eff6ff; --livre-border:#3b82f6; --livre-text:#1e3a8a;
-  --card-min-h:96px; --icon-size:38px;
-}
+/* Herdando base de styles.css */
+h1{margin:12px 0}

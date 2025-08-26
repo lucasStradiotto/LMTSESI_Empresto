@@ -1,202 +1,79 @@
-/* ====== TOKENS ====== */
+/* Base + utilitários + modal sticky-top (com scroll interno) */
 :root{
-  /* Livre (páginas internas podem sobrepor) */
-  --livre-bg:#ecfdf5; --livre-border:#10b981; --livre-text:#065f46;
-  /* Ocupado (comum) */
-  --ocupado-bg:#fff7ed; --ocupado-border:#f59e0b; --ocupado-text:#7c2d12;
+  --bg:#f8fafc;
+  --text:#0f172a;
+  --muted:#475569;
+  --border:#e5e7eb;
+  --shadow:0 20px 40px rgba(0,0,0,.18);
 
-  /* Dimensões de card/célula */
-  --card-min-h:100px;
-  --icon-size:40px;
+  --livre-start:#22c55e;
+  --livre-end:#16a34a;
+  --ocup-start:#fb923c;
+  --ocup-end:#f97316;
+  --manu:#ef4444;
 
-  /* UI base */
-  --surface:#fff; --text:#0f172a; --muted:#475569; --border:#e5e7eb;
+  --card-note:#e0f2fe;   /* azul claro */
+  --card-cel:#dcfce7;    /* verde claro */
+  --card-cam:#ffe4e6;    /* rosé */
 }
 
-/* ====== BASE ====== */
 *{box-sizing:border-box}
-body{
-  margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,"Helvetica Neue",Arial,"Noto Sans";
-  color:var(--text); background:#fff;
-}
-.painel-notebooks{ max-width:1100px; margin:24px auto; padding:0 16px; }
-main {
-  margin: 0 100px;
-}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif;}
+a{color:inherit;text-decoration:none}
+.container{max-width:1100px;margin:0 auto;padding:20px}
+.muted{color:var(--muted);font-size:.95rem}
 
-/* ====== HEADER ====== */
-.site-header{
-  position:sticky; top:0; z-index:50;
-  display:flex; align-items:center; justify-content:space-between; gap:12px;
-  padding:12px 16px; background:rgba(255,255,255,.85);
-  backdrop-filter:saturate(180%) blur(8px);
-  border-bottom:1px solid var(--border);
-}
-.logo{ font-weight:800; letter-spacing:.2px; color:var(--text); text-decoration:none; font-size:1.1rem; }
-.site-nav{ display:flex; align-items:center; gap:12px; }
-.site-nav a{
-  text-decoration:none; color:var(--text); padding:8px 12px; border-radius:10px; font-weight:600;
-  transition:background .15s,color .15s,transform .15s;
-}
-.site-nav a:hover{ background:#f1f5f9; transform:translateY(-1px) }
-.site-nav a[aria-current="page"]{ background:#e0f2fe; color:#075985; outline:2px solid #7dd3fc }
+/* Header navegação */
+.site-nav{display:flex;align-items:center;gap:16px;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border);background:#fff;position:sticky;top:0;z-index:50}
+.brand{display:flex;align-items:center;gap:10px}
+.brand img{height:28px;width:auto}
+.brand strong{font-size:1.1rem}
+.menu{display:flex;gap:10px;flex-wrap:wrap}
+.menu a{padding:8px 12px;border-radius:10px;border:1px solid var(--border);background:#fff}
+.menu a.active{background:#0ea5e9;color:#fff;border-color:#0ea5e9}
 
-.nav-toggle{
-  display:none; border:1px solid var(--border); background:#fff; border-radius:10px;
-  padding:6px 10px; font-size:1.1rem; cursor:pointer;
-}
-.nav-toggle:focus-visible{ outline:3px solid #2563eb; outline-offset:3px }
-@media (max-width:760px){
-  .nav-toggle{ display:inline-block }
-  .site-nav{
-    position:absolute; left:0; right:0; top:100%; display:grid; gap:8px; background:rgba(255,255,255,.98);
-    border-bottom:1px solid var(--border); padding:12px; transform-origin:top; transform:scaleY(0);
-    opacity:0; pointer-events:none; transition:transform .15s, opacity .15s;
-  }
-  .site-header.is-open .site-nav{ transform:scaleY(1); opacity:1; pointer-events:auto }
-}
+/* Cards da Home */
+.cards-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px;margin:14px 0}
+.card{background:#fff;border:1px solid var(--border);border-radius:16px;padding:16px;box-shadow:var(--shadow)}
+.card h2{margin:8px 0 4px}
+.card .card-icon{width:56px;height:56px;display:block}
+.card.resource-note{background:linear-gradient(180deg, #fff, var(--card-note))}
+.card.resource-cel{background:linear-gradient(180deg, #fff, var(--card-cel))}
+.card.resource-cam{background:linear-gradient(180deg, #fff, var(--card-cam))}
 
-/* ====== LEGENDA & TABELA ====== */
-.legenda{ display:flex; align-items:center; gap:16px; margin-bottom:10px; font-size:.95rem }
-.dot{ width:12px; height:12px; border-radius:999px; margin-right:6px; border:1px solid rgba(0,0,0,.1); display:inline-block }
-.dot.livre{ background:var(--livre-bg) }
-.dot.ocupado{ background:var(--ocupado-bg) }
+/* CTA Emprestar/Devolver */
+.cta-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;margin-top:20px}
+.cta{display:flex;align-items:center;justify-content:center;gap:10px;padding:16px;border-radius:16px;border:2px dashed var(--border);background:#fff;cursor:pointer;font-weight:600}
+.cta img{width:28px;height:28px}
 
-.tabela-notebooks{ border-collapse:collapse; width:100%; table-layout:fixed }
-.tabela-notebooks td{ padding:8px; vertical-align:top }
+/* Tabela grade dos inventários */
+.grade{width:100%;border-collapse:separate;border-spacing:8px}
+.grade td{padding:0}
+.notebook{position:relative;display:flex;align-items:center;gap:10px;justify-content:flex-start;border:1px solid var(--border);border-radius:14px;padding:10px 12px;background:#fff;min-height:58px;box-shadow:var(--shadow);cursor:default}
+.notebook.livre{background:linear-gradient(180deg,var(--livre-start),var(--livre-end));color:#fff;border-color:transparent}
+.notebook.ocupado{background:linear-gradient(180deg,var(--ocup-start),var(--ocup-end));color:#fff;border-color:transparent}
+.notebook.manutencao{background:#fff;color:#ef4444;border-color:#fecaca;outline:2px dashed #fca5a5}
+.notebook .nb-icon{width:28px;height:28px;object-fit:contain}
+.notebook .estado{position:absolute;opacity:0;pointer-events:none}
 
-/* Célula clicável */
-.notebook{
-  display:grid; place-items:center; gap:8px;
-  padding:14px 10px; min-height:var(--card-min-h);
-  border:2px solid var(--livre-border); border-radius:14px;
-  background:var(--livre-bg); color:var(--livre-text);
-  font-weight:700; user-select:none; cursor:pointer;
-  transition: transform .12s, box-shadow .12s, border-color .12s, background .12s, color .12s;
-}
-.notebook:hover{ transform:translateY(-1px); box-shadow:0 8px 18px rgba(0,0,0,.06) }
-.notebook.ocupado{ background:var(--ocupado-bg); border-color:var(--ocupado-border); color:var(--ocupado-text) }
+/* Botão de manutenção dentro da célula */
+.btn-manut{position:absolute;right:8px;top:8px;border:none;background:transparent;cursor:pointer;font-size:18px;line-height:1}
 
-.notebook-icon{ width:var(--icon-size); height:var(--icon-size); object-fit:contain; display:block }
-.notebook-id{ font-size:1.02rem; letter-spacing:.2px }
+/* Botões */
+.btn{padding:8px 12px;border-radius:10px;border:1px solid var(--border);background:#fff;cursor:pointer}
+.btn-outline{background:#fff}
+.btn-primary{background:#0ea5e9;border-color:#0ea5e9;color:#fff}
 
-/* Checkbox oculto, acessível */
-.sr-only{
-  position:absolute!important; width:1px!important; height:1px!important; padding:0!important; margin:-1px!important;
-  overflow:hidden!important; clip:rect(0,0,0,0)!important; white-space:nowrap!important; border:0!important;
-}
-.notebook:focus-within{ outline:3px solid #2563eb; outline-offset:3px }
+/* Modal */
+.modal-backdrop{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;z-index:100}
+.modal-backdrop.open{display:block}
+.modal{position:fixed;top:0;left:50%;transform:translateX(-50%);width:min(92vw,560px);max-height:100vh;overflow-y:auto;background:#fff;border:1px solid var(--border);border-radius:16px;padding:16px;box-shadow:var(--shadow)}
+.modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:8px}
+body.modal-open{overflow:hidden}
 
-/* Badge de resumo na página (acima da tabela) */
-.status-resumo{ display:flex; align-items:center; gap:10px; margin:8px 0 14px }
-.badge-resumo{
-  display:inline-flex; align-items:center; gap:6px;
-  font-weight:700; font-size:.92rem;
-  padding:6px 10px; border-radius:999px; background:#f8fafc; border:1px solid #e2e8f0; color:#0f172a;
-}
-.badge-resumo .dot{ margin:0 }
+/* Inputs do wizard/filters */
+.toggle{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--border);padding:8px 10px;border-radius:10px;background:#fff}
+.inp{padding:10px;border:1px solid var(--border);border-radius:10px}
 
-/* Responsivo */
-@media (max-width:520px){
-  .tabela-notebooks td{ padding:6px }
-  .notebook{ padding:12px }
-}
-
-/* ===== Botões ===== */
-.btn{
-  display:inline-flex; align-items:center; gap:8px;
-  padding:8px 12px; border-radius:10px; font-weight:700; font-size:.92rem;
-  cursor:pointer; transition:background .15s, color .15s, border-color .15s, box-shadow .15s;
-}
-.btn:focus-visible{ outline:3px solid #2563eb; outline-offset:3px }
-.btn-outline{
-  background:#fff; color:#0f172a; border:1px solid #e5e7eb;
-}
-.btn-outline:hover{
-  border-color:#cbd5e1; box-shadow:0 6px 16px rgba(0,0,0,.08);
-}
-
-/* ===== Estado: Manutenção (vermelho) ===== */
-:root{
-  --manut-bg:#fee2e2;     /* vermelho clarinho */
-  --manut-border:#ef4444; /* vermelho */
-  --manut-text:#7f1d1d;   /* vermelho escuro */
-}
-.notebook.manutencao{
-  background:var(--manut-bg);
-  border-color:var(--manut-border);
-  color:var(--manut-text);
-}
-
-/* Wrapper da célula para posicionar o botão de manutenção */
-.cell{ position: relative; }
-
-/* Botão de manutenção (canto superior direito) */
-.btn-maint{
-  position:absolute; top:6px; right:6px;
-  width:28px; height:28px; padding:0;
-  display:inline-grid; place-items:center;
-  border:1px solid var(--border); background:#fff; border-radius:999px;
-  cursor:pointer; box-shadow:0 1px 2px rgba(0,0,0,.05);
-}
-.btn-maint:hover{ box-shadow:0 6px 16px rgba(0,0,0,.08); }
-.btn-maint img{ width:16px; height:16px; object-fit:contain; display:block }
-
-/* Backdrop ocupa a tela toda; rolagem se o conteúdo estourar */
-.modal-backdrop{
-  position: fixed;
-  inset: 0;
-  background: rgba(15,23,42,.45);
-  display: none;
-  z-index: 100;
-}
-
-/* Mostrar quando abrir */
-.modal-backdrop.open{ display: block; }
-
-/* Modal fixo no topo, centralizado na horizontal.
-   Ganha rolagem interna se passar da altura da viewport. */
-.modal{
-  position: fixed;
-  top: 50px;                /* grudadinho no topo */
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(92vw, 560px);         /* ajuste se quiser mais largo/estreito */
-  max-height: 90vh;               /* nunca passa da viewport */
-  overflow-y: auto;                /* rolagem interna */
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 16px;
-  padding: 16px;
-  box-shadow: 0 20px 40px rgba(0,0,0,.18);
-}
-
-/* Evita a página ao fundo rolar quando o modal estiver aberto */
-body.modal-open{ overflow: hidden; }
-
-.modal h3{ margin:0 0 6px; font-size:1.05rem; }
-.modal p{ margin:0 0 12px; color:#475569; font-size:.95rem; }
-.modal-actions{ display:flex; justify-content:flex-end; gap:8px; }
-.btn-danger{ background:#ef4444; color:#fff; border:1px solid #ef4444; }
-.btn-danger:hover{ filter:brightness(0.95); }
-
-/* Dot extra da legenda */
-.dot.manutencao{ background: var(--manut-bg); }
-
-/* Badge vermelha (Home) */
-.badge-warn{
-  display:inline-flex; align-items:center; gap:6px;
-  font-weight:700; font-size:.9rem;
-  padding:6px 10px; border-radius:999px;
-  background: #fef2f2;           /* red-50 */
-  border: 1px solid #fecaca;     /* red-200 */
-  color: #7f1d1d;                /* red-900 */
-}
-
-/* Toggle da Home (opcional, só estética) */
-.toggle{
-  display:inline-flex; align-items:center; gap:8px;
-  padding:6px 10px; border:1px solid var(--border); border-radius:10px;
-  background:#fff; font-weight:600; cursor:pointer;
-}
-.toggle input{ accent-color:#ef4444; transform:translateY(1px); }
+/* Grid de checkboxes no wizard */
+.checks-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;margin-top:4px}

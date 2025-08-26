@@ -1,9 +1,9 @@
 <?php
-// config.php
+// Ajuste as credenciais abaixo para o seu MySQL.
 $DB_HOST = '127.0.0.1';
 $DB_NAME = 'lab_emprestimos';
-$DB_USER = 'lab_user';      // crie esse user com permissão no banco
-$DB_PASS = 'senha-forte-aqui';
+$DB_USER = 'root';
+$DB_PASS = '';
 
 $dsn = "mysql:host=$DB_HOST;dbname=$DB_NAME;charset=utf8mb4";
 $options = [
@@ -13,13 +13,9 @@ $options = [
 ];
 $pdo = new PDO($dsn, $DB_USER, $DB_PASS, $options);
 
-// Whitelist pra evitar SQL injection em nome de tabela
 function tableName(string $recurso): string {
-  $map = [
-    'notebooks' => 'notebook',
-    'celulares' => 'celular',
-    'cameras'   => 'camera',
-  ];
+  $map = ['notebooks'=>'notebook','celulares'=>'celular','cameras'=>'camera'];
   if (!isset($map[$recurso])) throw new InvalidArgumentException('Recurso inválido');
   return $map[$recurso];
 }
+header('Content-Type: application/json; charset=utf-8');

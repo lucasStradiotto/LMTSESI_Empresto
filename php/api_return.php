@@ -2,7 +2,7 @@
 require __DIR__.'/config.php';
 header('Content-Type: application/json; charset=utf-8');
 
-$input = json_decode(file_get_contents('php://input'), true);
+$input   = json_decode(file_get_contents('php://input'), true);
 $recurso = $input['recurso'] ?? '';
 $codigos = $input['codigos'] ?? [];
 
@@ -12,7 +12,8 @@ try {
 
   $pdo->beginTransaction();
 
-  $sql = "UPDATE `$table` SET status='disponivel', updated_at=NOW() WHERE codigo=? AND status='ocupado'";
+  $sql = "UPDATE `$table` SET status='disponivel', updated_at=NOW()
+          WHERE codigo=? AND status='ocupado'";
   $upd = $pdo->prepare($sql);
 
   $ok = []; $jaLivre = []; $inexistente = [];
@@ -24,18 +25,23 @@ try {
     if ($row['status'] !== 'ocupado') { $jaLivre[] = $codigo; continue; }
 
     $upd->execute([$codigo]);
-    if ($upd->rowCount() === 1) $ok[] = $codigo;
-  }
+    if ($upd->rowCount() === 1) {
+      $ok[] = $codigo;
 
-  if ($ok) {
-    $ins = $pdo->prepare("INSERT INTO movimentos (recurso, codigo, tipo) VALUES (?, ?, 'devolucao')");
-    foreach ($ok as $codigo) $ins->execute([$recurso, $codigo]);
+      // copia o req_id do último empréstimo (se houver) para amarrar a devolução
+      $selReq = $pdo->prepare("SELECT req_id FROM movimentos WHERE recurso=? AND codigo=? AND tipo='emprestimo' ORDER BY created_at DESC LIMIT 1");
+      $selReq->execute([$recurso, $codigo]);
+      $req_id = $selReq->fetchColumn() ?: null;
+
+      $pdo->prepare("INSERT INTO movimentos (recurso, codigo, tipo, req_id, devolucao_at) VALUES (?, ?, 'devolucao', ?, NOW())")
+          ->execute([$recurso, $codigo, $req_id]);
+    }
   }
 
   $pdo->commit();
-  echo json_encode(['ok'=>true, 'devolvidos'=>$ok, 'ja_livres'=>$jaLivre, 'inexistentes'=>$inexistente], JSON_UNESCAPED_UNICODE);
+  echo json_encode(['ok'=>true,'devolvidos'=>$ok,'ja_livres'=>$jaLivre,'inexistentes'=>$inexistente], JSON_UNESCAPED_UNICODE);
 } catch (Throwable $e) {
   if ($pdo->inTransaction()) $pdo->rollBack();
   http_response_code(400);
-  echo json_encode(['ok'=>false, 'error'=>$e->getMessage()], JSON_UNESCAPED_UNICODE);
+  echo json_encode(['ok'=>false,'error'=>$e->getMessage()], JSON_UNESCAPED_UNICODE);
 }

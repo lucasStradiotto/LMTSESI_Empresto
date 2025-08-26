@@ -1,102 +1,174 @@
-/* Grade */
-.cards-grid{
-  display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
-  gap:16px; margin-block:20px;
+/* Home específica */
+.hero h1{margin:8px 0 4px}
+.hero p{margin:0;color:var(--muted)}
+.card a.btn{margin-top:8px;display:inline-block}
+
+/* ----- Empréstimos Ativos (compacto) ----- */
+.active-loans{margin-top:28px}
+.active-loans .al-header{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.active-loans .al-actions{display:flex;gap:8px;flex-wrap:wrap}
+.al-groups{display:grid;grid-template-columns:1fr;gap:16px}
+@media (min-width: 960px){
+  .al-groups{grid-template-columns:repeat(3,1fr)}
+}
+.al-group h3{margin:8px 0}
+.al-list{display:flex;flex-direction:column;gap:8px}
+
+/* Card compacto */
+.al-card{
+  position:relative;
+  background:#fff;
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:10px 12px;
+  box-shadow:var(--shadow);
+  outline:none;
+}
+.al-card:focus{box-shadow:0 0 0 3px rgba(14,165,233,.3), var(--shadow)}
+.al-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.al-nome{font-weight:600}
+.al-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:4px}
+.al-date{color:var(--muted);font-size:.92rem}
+.badge{display:inline-block;border-radius:999px;padding:2px 8px;font-size:.82rem;border:1px solid var(--border);background:#fff}
+.badge.item{background:#eef2ff;border-color:#c7d2fe}
+.badge.cat-aluno{background:#e0f2fe;border-color:#bae6fd}
+.badge.cat-professor{background:#fef9c3;border-color:#fde68a}
+.badge.cat-colaborador{background:#fce7f3;border-color:#fbcfe8}
+
+/* Tooltip de detalhes (aparece no hover/focus) */
+.al-tooltip{
+  position:absolute;
+  left:0;
+  top:100%;
+  margin-top:6px;
+  width:min(520px, 92vw);
+  z-index:20;
+  background:#fff;
+  border:1px solid var(--border);
+  border-radius:12px;
+  box-shadow:var(--shadow);
+  padding:10px 12px;
+  opacity:0;
+  visibility:hidden;
+  transform:translateY(-3px);
+  transition:opacity .15s ease, transform .15s ease, visibility .15s;
+}
+.al-card:hover .al-tooltip,
+.al-card:focus .al-tooltip{
+  opacity:1; visibility:visible; transform:translateY(0);
+}
+.al-tip-section{display:grid;gap:8px}
+.al-tip-info{color:#0f172a}
+.al-tip-itens ul{margin:6px 0 0 16px;padding:0}
+.al-tip-itens li{margin:2px 0}
+
+/* Cards clicáveis na Home */
+.card.clickable{
+  cursor: pointer;
+  position: relative;
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+.card.clickable:hover{
+  transform: translateY(-2px) scale(1.01);
+  box-shadow: 0 10px 18px rgba(2, 6, 23, .08), var(--shadow);
+}
+.card.clickable:active{
+  transform: translateY(0) scale(.998);
+}
+.card.clickable::after{
+  content:"";
+  position:absolute; inset:0;
+  border-radius:12px;
+  box-shadow: 0 0 0 0 rgba(14,165,233,.25);
+  transition: box-shadow .18s ease;
+  pointer-events:none;
+}
+.card.clickable:hover::after{
+  box-shadow: 0 0 0 3px rgba(14,165,233,.25);
 }
 
-/* Card base */
-.card-emprestimo{
-  display:flex; align-items:center; gap:14px;
-  padding:16px; border:2px solid #e5e7eb; border-radius:16px;
-  background:#fff; text-decoration:none; color:#0f172a;
-  box-shadow:0 1px 2px rgba(0,0,0,.05);
-  transition:transform .15s, box-shadow .15s, border-color .15s, background .15s;
-}
-.card-emprestimo:hover{ transform:translateY(-2px); box-shadow:0 10px 24px rgba(15,23,42,.10) }
-.card-emprestimo:focus-visible{ outline:3px solid #2563eb; outline-offset:3px }
-
-.card-icon{ width:42px; height:42px; object-fit:contain; flex:0 0 auto }
-.card-text h3{ margin:0 0 4px; font-size:1.12rem; line-height:1.2; font-weight:800 }
-.card-text p{ margin:0 0 10px; font-size:.95rem; color:#475569 }
-.card-meta{ display:flex; align-items:center; gap:10px }
-.cta{ font-weight:700; font-size:.92rem }
-
-/* Badge (home) */
-.badge{
-  display:inline-flex; align-items:center; gap:6px;
-  font-weight:700; font-size:.9rem;
-  padding:6px 10px; border-radius:999px; background:#f8fafc; border:1px solid #e2e8f0; color:#0f172a;
+/* Acessibilidade: foco de teclado */
+.card.clickable:focus{
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(14,165,233,.35), var(--shadow);
 }
 
-/* VARIAÇÕES de cor (mesmas das páginas internas) */
-.card--note{ background:#ecfdf5; border-color:#10b981 }
-.card--note h3,.card--note .cta{ color:#065f46 }
-
-.card--cel{ background:#eff6ff; border-color:#3b82f6 }
-.card--cel h3,.card--cel .cta{ color:#1e3a8a }
-
-.card--cam{ background:#ecfeff; border-color:#06b6d4 }
-.card--cam h3,.card--cam .cta{ color:#164e63 }
-
-/* Responsivo */
-@media (max-width:520px){
-  .card-emprestimo{ padding:14px }
-  .card-icon{ width:36px; height:36px }
+/* Respeita usuários com “reduzir animações” */
+@media (prefers-reduced-motion: reduce){
+  .card.clickable{ transition: none; }
+  .card.clickable:hover{ transform:none; }
+  .card.clickable:active{ transform:none; }
+  .card.clickable::after{ transition: none; }
 }
 
-/* Espaçamento da barra de ações da Home */
-.home-toolbar{
-  display:flex; justify-content:flex-end; gap:10px;
-  margin-top:14px; margin-bottom:10px;
+/* Linha/badge com ícone */
+.stat{
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 0;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: var(--shadow);
+  font-size: .95rem;
+}
+.stat .label{ color: #475569; margin-right: 4px; }
+.stat-free{ border-color:#c7d2fe; background:#fff; }
+.stat-manu{ border-color:#fde68a; background:#fef9c3; }
+
+.badge-icon{
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  flex: 0 0 18px;
+  filter: drop-shadow(0 1px 0 rgba(0,0,0,.05));
 }
 
-.home-toolbar{
-  display:flex; flex-wrap:wrap; align-items:center; gap:10px;
-  margin-top:14px; margin-bottom:10px;
+/* Animação sutil (remova a classe .icon-anim no HTML se não quiser) */
+.icon-anim{ animation: floaty 3s ease-in-out infinite; }
+@keyframes floaty{
+  0%, 100% { transform: translateY(0); opacity: .95; }
+  50% { transform: translateY(-2px); opacity: 1; }
 }
 
-/* Grade dos botões-ação (mesma lógica dos cards) */
-.actions-grid{
-  display:grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap:16px;
-  margin:20px 0;
+/* (opcional) outra vibe: pulsar leve
+.icon-anim{ animation: pulse-soft 2.8s ease-in-out infinite; }
+@keyframes pulse-soft{
+  0%,100%{ transform: scale(1); opacity:.95 }
+  50%{ transform: scale(1.05); opacity:1 }
+}
+*/
+
+/* ===== Badges com ícone (mantendo seu fundo branco em .stat-free) ===== */
+.stat{
+  display:inline-flex; align-items:center; gap:8px;
+  margin:4px 0 0; padding:4px 8px;
+  border:1px solid var(--border); border-radius:999px;
+  background:#fff; box-shadow:var(--shadow);
+  font-size:.95rem;
+}
+.stat .label{ color:#475569; margin-right:4px; }
+
+/* Mantém seu ajuste: fundo branco em "livres" */
+.stat-free{ border-color:#c7d2fe; background:#fff; }        /* 👈 mantém #fff */
+.stat-manu{ border-color:#fde68a; background:#fef9c3; }
+
+.badge-icon-svg{ width:18px; height:18px; display:inline-flex; color:var(--icon-free, #16a34a); }
+.stat-manu .badge-icon-svg{ color:var(--icon-manu, #f59e0b); }
+
+/* Tema por recurso (opcional, deixe se curtir a vibe) */
+.card.resource-note{ --icon-free:#16a34a; --icon-manu:#f59e0b; } /* verde / âmbar */
+.card.resource-cel { --icon-free:#0ea5e9; --icon-manu:#f59e0b; } /* azul-ciano / âmbar */
+.card.resource-cam { --icon-free:#22c55e; --icon-manu:#f59e0b; } /* verde-lima / âmbar */
+
+/* Animação sutil (remova .icon-anim no HTML para desativar) */
+.icon-anim{ animation: floaty 3s ease-in-out infinite; }
+@keyframes floaty{
+  0%,100%{ transform:translateY(0); opacity:.95; }
+  50%    { transform:translateY(-2px); opacity:1; }
 }
 
-/* Card-ação: visual idêntico ao card-emprestimo, mas é <button> */
-.card-acao{
-  all:unset;                /* reseta estilo de botão nativo */
-  display:flex; align-items:center; gap:14px;
-  padding:16px;
-  border:2px solid #e5e7eb; border-radius:16px;
-  background:#fff; color:#0f172a;
-  box-shadow:0 1px 2px rgba(0,0,0,.05);
-  cursor:pointer;
-  transition: transform .15s, box-shadow .15s, border-color .15s, background .15s;
-}
-.card-acao:hover{ transform:translateY(-2px); box-shadow:0 10px 24px rgba(15,23,42,.10) }
-.card-acao:focus-visible{ outline:3px solid #2563eb; outline-offset:3px }
-.card-acao .card-icon{ width:42px; height:42px; object-fit:contain; flex:0 0 auto }
-.card-acao .card-text h3{ margin:0 0 4px; font-size:1.12rem; line-height:1.2; font-weight:800 }
-.card-acao .card-text p{ margin:0; font-size:.95rem; color:#475569 }
-
-/* Cores dos botões-ação */
-.card--emp{ background:#ecfdf5; border-color:#10b981 }
-.card--emp h3{ color:#065f46 }
-
-.card--dev{ background:#f1f5f9; border-color:#94a3b8 } /* neutro elegante */
-.card--dev h3{ color:#0f172a }
-
-@media (max-width:520px){
-  .card-acao{ padding:14px }
-  .card-acao .card-icon{ width:36px; height:36px }
-}
-
-/* Grid de checkboxes no passo de itens */
-.checks-grid{
-  display:grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap:8px;
-  margin-top:4px;
-}
-.checks-grid .toggle{ justify-content:flex-start; }
+/* Caso volte a usar <img class="badge-icon"> no lugar do SVG */
+.badge-icon{ width:18px; height:18px; object-fit:contain; flex:0 0 18px; filter:drop-shadow(0 1px 0 rgba(0,0,0,.05)); }

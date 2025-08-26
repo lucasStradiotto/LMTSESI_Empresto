@@ -1,11 +1,6 @@
--- Crie o banco (ajuste o nome se quiser)
 CREATE DATABASE IF NOT EXISTS lab_emprestimos
-  CHARACTER SET utf8mb4;
+  CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
 USE lab_emprestimos;
-
--- Status controlado por ENUM; manutencao = 0/1
--- Coluna "codigo" casa 1:1 com o número que aparece na sua UI.
--- "patrimonio" é opcional (pode ser NULL) mas é unique se usado.
 
 CREATE TABLE notebook (
   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -46,13 +41,12 @@ CREATE TABLE camera (
   KEY idx_camera_manut (manutencao)
 ) ENGINE=InnoDB;
 
--- (Opcional, mas altamente recomendado) histórico de operações
 CREATE TABLE movimentos (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   recurso ENUM('notebooks','celulares','cameras') NOT NULL,
   codigo INT NOT NULL,
   tipo ENUM('emprestimo','devolucao','manut_on','manut_off') NOT NULL,
-  payload JSON NULL,                  -- dados de formulário (nome, turma, etc.)
+  payload JSON NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   KEY idx_mov_recurso_codigo (recurso, codigo),
   KEY idx_mov_tipo (tipo)

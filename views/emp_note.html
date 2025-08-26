@@ -1,63 +1,25 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Painel de Empréstimo — Notebooks</title>
-  <link rel="stylesheet" href="../css/styles.css" />
-  <link rel="stylesheet" href="../css/emp_note.css" />
+  <title>Notebooks — Inventário</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="../css/styles.css">
+  <link rel="stylesheet" href="../css/emp_note.css">
 </head>
 <body>
+  <header id="site-header"></header>
 
-    <!-- Header principal -->
-    <header class="site-header">
-        <a href="index.html" class="logo" aria-label="Voltar para a página inicial">
-            LabTec
-        </a>
+  <main class="container">
+    <h1>Notebooks — Inventário</h1>
+    <table id="tabela-notebooks" class="grade">
+      <tbody></tbody>
+    </table>
+    <p class="muted">Clique no ícone 🛠 para alternar manutenção.</p>
+  </main>
 
-        <button class="nav-toggle" aria-expanded="false" aria-controls="site-menu">
-            <span class="sr-only">Abrir menu</span>
-            ☰
-        </button>
-
-        <nav id="site-menu" class="site-nav" aria-label="Navegação principal">
-            <a href="../index.html">Início</a>
-            <a href="emp_note.html">Empréstimo de Notebook</a>
-            <a href="emp_cel.html">Empréstimo de Celulares</a>
-            <a href="emp_cam.html">Empréstimo de Câmera Fotográfica</a>
-        </nav>
-    </header>
-
-    <main id="conteudo" class="painel-notebooks">
-      <div class="status-resumo">
-        <span class="badge-resumo"><span class="dot livre"></span><span id="resumo-note">–</span></span>
-      </div>
-
-      <div id="legenda-notebooks" class="legenda" aria-live="polite">
-        <span class="dot livre"></span> Livre
-        <span class="dot ocupado"></span> Ocupado
-        <span class="dot manutencao"></span> Em manutenção
-      </div>
-
-      <table id="tabela-notebooks" class="tabela-notebooks" aria-describedby="legenda-notebooks">
-        <tbody></tbody>
-      </table>
-    </main>
-
-    <div class="status-resumo">
-      <span class="badge-resumo"><span class="dot livre"></span><span id="resumo-note">–</span></span>
-
-      <!-- NOVO: baixar modelo simples -->
-      <button type="button" class="btn btn-outline" id="download-modelo-note">Baixar modelo (CSV)</button>
-
-      <button type="button" class="btn btn-outline" id="export-note">Exportar CSV</button>
-
-      <input type="file" accept=".csv" id="import-note-file" class="sr-only" />
-      <button type="button" class="btn btn-outline" id="import-note">Importar CSV</button>
-    </div>
-
-
-  <script src="/js/emp_note.js" defer></script>
-  <script src="nav.js" defer></script>
+  <script src="../js/nav.js"></script>
+  <script src="../js/script.js"></script>
+  <script src="../js/emp_note.js"></script>
 </body>
 </html>

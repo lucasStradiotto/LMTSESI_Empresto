@@ -1,117 +1,183 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-BR">
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Empréstimos LMT - SESI CE 308</title>
-    <link rel="stylesheet" href="./css/styles.css" />
-    <link rel="stylesheet" href="./css/index.css" />
+    <meta charset="utf-8" />
+    <title>LMT SESI — Empréstimos</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- Estilos -->
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/index.css">
 </head>
+
 <body>
-    <!-- Header principal -->
-    <header class="site-header">
-        <a href="index.html" class="logo" aria-label="Voltar para a página inicial">
-            LabTec
-        </a>
+    <header id="site-header"></header>
 
-        <button class="nav-toggle" aria-expanded="false" aria-controls="site-menu">
-            <span class="sr-only">Abrir menu</span>
-            ☰
-        </button>
-
-        <nav id="site-menu" class="site-nav" aria-label="Navegação principal">
-            <a href="./index.html">Início</a>
-            <a href="./views/emp_note.html">Empréstimo de Notebook</a>
-            <a href="./views/emp_cel.html">Empréstimo de Celulares</a>
-            <a href="./views/emp_cam.html">Empréstimo de Câmera Fotográfica</a>
-        </nav>
-    </header>
-    <br>
-    <br>
-    <main>
-        <!-- Ações principais -->
-        <section class="actions-grid">
-        <!-- Emprestar -->
-        <button type="button" class="card-acao card--emp" id="abrir-emprestar" aria-label="Abrir formulário de empréstimo">
-            <img class="card-icon" src="assets/icons/form-emprestar.png" alt="" aria-hidden="true" />
-            <div class="card-text">
-            <h3>Emprestar</h3>
-            <p>Registrar retirada de itens por usuário.</p>
-            </div>
-        </button>
-
-        <!-- Devolver -->
-        <button type="button" class="card-acao card--dev" id="abrir-devolver" aria-label="Abrir formulário de devolução">
-            <img class="card-icon" src="assets/icons/form-devolver.png" alt="" aria-hidden="true" />
-            <div class="card-text">
-            <h3>Devolver</h3>
-            <p>Registrar devolução e liberar os itens.</p>
-            </div>
-        </button>
+    <main class="container">
+        <section class="hero">
+            <h1>Laboratório — Empréstimos</h1>
+            <p>Gerencie notebooks, celulares e câmeras com agilidade.</p>
         </section>
-
-        <section class="home-toolbar">
-            <button type="button" class="btn btn-outline" id="export-resumo">Exportar resumo (CSV)</button>
-            <button type="button" class="btn btn-outline" id="download-modelo-resumo">Baixar modelo (CSV)</button>
-            <input type="file" accept=".csv" id="import-resumo-file" class="sr-only" />
-            <button type="button" class="btn btn-outline" id="import-resumo">Importar resumo (CSV)</button>
-
-            <!-- NOVO: Filtro -->
-            <label class="toggle" style="margin-left:auto;">
-                <input type="checkbox" id="toggle-only-manut" />
-                Mostrar apenas categorias com itens em manutenção
-            </label>
-        </section>
-
         <section class="cards-grid">
-        <!-- Notebooks -->
-        <a class="card-emprestimo card--note" href="views/emp_note.html" aria-label="Ir para empréstimo de notebooks">
-            <img class="card-icon" src="./assets/icons/notebook.png" alt="" aria-hidden="true" />
-            <div class="card-text">
-                <h3>Notebooks</h3>
-                <p>Empréstimo de notebooks do laboratório.</p>
-                <div class="card-meta">
-                    <span class="badge" id="badge-note">–</span>
-                    <span class="badge-warn" id="manu-note">Em manutenção: –</span>
-                    <span class="cta">Emprestar</span>
-                </div>
-            </div>
-        </a>
+            <!-- Card Notebooks -->
+            <article class="card resource-note clickable" data-href="views/emp_note.html" role="link"
+                aria-label="Abrir inventário de notebooks" tabindex="0">
+                <img src="assets/icons/notebook.png" alt="" class="card-icon">
+                <h2>Notebooks</h2>
 
-        <!-- Celulares -->
-        <a class="card-emprestimo card--cel" href="views/emp_cel.html" aria-label="Ir para empréstimo de celulares">
-            <img class="card-icon" src="./assets/icons/celular.png" alt="" aria-hidden="true" />
-            <div class="card-text">
-                <h3>Celulares</h3>
-                <p>Empréstimo de celulares para atividades pedagógicas.</p>
-                <div class="card-meta">
-                    <span class="badge" id="badge-cel">–</span>
-                    <span class="badge-warn" id="manu-cel">Em manutenção: –</span>
-                    <span class="cta">Emprestar</span>
-                </div>
-            </div>
-        </a>
+                <!-- Badge de livres com ícone -->
+                <p class="stat stat-free">
+                    <!-- <img class="badge-icon icon-anim" src="assets/icons/livre.gif" alt="Itens livres"> -->
+                    <span class="badge-icon-svg icon-anim" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false">
+                            <circle cx="12" cy="12" r="9"></circle>
+                            <path d="M8 12l2.5 2.5L16 9"></path>
+                        </svg>
+                    </span>
+                    <span id="badge-note">—</span>
+                </p>
 
-        <!-- Câmeras -->
-        <a class="card-emprestimo card--cam" href="views/emp_cam.html" aria-label="Ir para empréstimo de câmeras fotográficas">
-            <img class="card-icon" src="./assets/icons/camera.png" alt="" aria-hidden="true" />
-            <div class="card-text">
-                <h3>Câmeras</h3>
-                <p>Empréstimo de câmeras fotográficas.</p>
-                <div class="card-meta">
-                    <span class="badge" id="badge-cam">–</span>
-                    <span class="badge-warn" id="manu-cam">Em manutenção: –</span>
-                    <span class="cta">Emprestar</span>
-                </div>
-            </div>
-        </a>
+                <!-- Linha de manutenção com ícone -->
+                <p class="stat stat-manu">
+                    <!-- <img class="badge-icon icon-anim" src="assets/icons/manutencao.png" alt="Itens em manutenção"> -->
+                    <span class="badge-icon-svg icon-anim" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false">
+                            <path
+                                d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3H20.47a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z">
+                            </path>
+                            <line x1="12" y1="9" x2="12" y2="13"></line>
+                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                        </svg>
+                    </span>
+
+
+                    <span class="label">Em manutenção:</span>
+                    <span id="manu-note">—</span>
+                </p>
+            </article>
+
+            <!-- Card Celulares -->
+            <article class="card resource-cel clickable" data-href="views/emp_cel.html" role="link"
+                aria-label="Abrir inventário de celulares" tabindex="0">
+                <img src="assets/icons/celular.png" alt="" class="card-icon">
+                <h2>Celulares</h2>
+
+                <p class="stat stat-free">
+                    <!-- <img class="badge-icon icon-anim" src="assets/icons/livre.gif" alt="Itens livres"> -->
+                    <span class="badge-icon-svg icon-anim" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false">
+                            <circle cx="12" cy="12" r="9"></circle>
+                            <path d="M8 12l2.5 2.5L16 9"></path>
+                        </svg>
+                    </span>
+                    <span id="badge-cel">—</span>
+                </p>
+                <p class="stat stat-manu">
+                    <!-- <img class="badge-icon icon-anim" src="assets/icons/manutencao.png" alt="Itens em manutenção"> -->
+                    <span class="badge-icon-svg icon-anim" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false">
+                            <path
+                                d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3H20.47a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z">
+                            </path>
+                            <line x1="12" y1="9" x2="12" y2="13"></line>
+                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                        </svg>
+                    </span>
+
+                    <span class="label">Em manutenção:</span>
+                    <span id="manu-cel">—</span>
+                </p>
+            </article>
+
+            <!-- Card Câmeras -->
+            <article class="card resource-cam clickable" data-href="views/emp_cam.html" role="link"
+                aria-label="Abrir inventário de câmeras" tabindex="0">
+                <img src="assets/icons/camera.png" alt="" class="card-icon">
+                <h2>Câmeras</h2>
+
+                <p class="stat stat-free">
+                    <!-- <img class="badge-icon icon-anim" src="assets/icons/livre.gif" alt="Itens livres"> -->
+                    <span class="badge-icon-svg icon-anim" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false">
+                            <circle cx="12" cy="12" r="9"></circle>
+                            <path d="M8 12l2.5 2.5L16 9"></path>
+                        </svg>
+                    </span>
+                    <span id="badge-cam">—</span>
+                </p>
+                <p class="stat stat-manu">
+                    <!-- <img class="badge-icon icon-anim" src="assets/icons/manutencao.png" alt="Itens em manutenção"> -->
+                    <span class="badge-icon-svg icon-anim" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false">
+                            <path
+                                d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3H20.47a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z">
+                            </path>
+                            <line x1="12" y1="9" x2="12" y2="13"></line>
+                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                        </svg>
+                    </span>
+
+                    <span class="label">Em manutenção:</span>
+                    <span id="manu-cam">—</span>
+                </p>
+            </article>
         </section>
+
+
+        <section class="cta-grid">
+            <button id="btn-abrir-emprestar" class="cta">
+                <img src="assets/icons/form-emprestar.png" alt="" />
+                Emprestar
+            </button>
+            <button id="btn-abrir-devolver" class="cta">
+                <img src="assets/icons/form-devolver.png" alt="" />
+                Devolver
+            </button>
+        </section>
+
+        <!-- ===== NOVO: Empréstimos Ativos ===== -->
+        <section class="active-loans">
+            <div class="al-header">
+                <h2>Empréstimos Ativos</h2>
+                <div class="al-actions">
+                    <button id="btn-refresh-ativos" class="btn btn-outline">Atualizar</button>
+                    <a class="btn btn-outline" href="php/api_relatorio.php?tipo=movimentos&format=csv">Baixar CSV
+                        (Movimentos)</a>
+                </div>
+            </div>
+            <div class="al-groups">
+                <div class="al-group" data-res="notebooks">
+                    <h3>Notebooks</h3>
+                    <div class="al-list" id="al-notebooks"></div>
+                </div>
+                <div class="al-group" data-res="celulares">
+                    <h3>Celulares</h3>
+                    <div class="al-list" id="al-celulares"></div>
+                </div>
+                <div class="al-group" data-res="cameras">
+                    <h3>Câmeras</h3>
+                    <div class="al-list" id="al-cameras"></div>
+                </div>
+            </div>
+        </section>
+        <!-- ================================ -->
     </main>
+
+    <!-- Bibliotecas para PDF/QR apenas na Home (onde geramos comprovante) -->
     <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
-    <!-- no final do body da HOME -->
-    <script src="./js/index.js" defer></script>
-    <script src="nav.js" defer></script>
+
+    <!-- Scripts -->
+    <script src="js/nav.js"></script>
+    <script src="js/script.js"></script>
+    <script src="js/index.js"></script>
 </body>
+
 </html>
