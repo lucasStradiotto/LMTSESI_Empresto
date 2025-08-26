@@ -77,3 +77,48 @@ body.modal-open{overflow:hidden}
 
 /* Grid de checkboxes no wizard */
 .checks-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;margin-top:4px}
+
+/* ========= Modais padrão (confirm/notify) ========= */
+.modal{ background:#fff; border:1px solid var(--border, #e5e7eb); border-radius:14px; box-shadow:0 20px 40px rgba(2,6,23,.18); padding:14px 14px 12px; width:min(520px, 92vw); max-height:90vh; overflow:auto; }
+.modal-header{ display:flex; align-items:center; gap:8px; margin:4px 0 8px; }
+.modal-title{ margin:0; font-size:1.1rem; }
+.modal-icon{ display:inline-flex; width:22px; height:22px; color:#0ea5e9; }
+.modal-body{ color:#0f172a; }
+.modal-body p{ margin:.5rem 0; }
+.modal-actions{ display:flex; justify-content:flex-end; gap:8px; margin-top:12px; }
+
+/* Estados por tipo */
+.modal.is-info  .modal-icon{ color:#0ea5e9; }
+.modal.is-success .modal-icon{ color:#16a34a; }
+.modal.is-warning .modal-icon{ color:#f59e0b; }
+.modal.is-danger  .modal-icon{ color:#ef4444; }
+
+/* Botões */
+.btn{ appearance:none; border-radius:10px; padding:8px 12px; font-weight:600; cursor:pointer; border:1px solid var(--border,#e5e7eb); background:#fff; }
+.btn:hover{ filter:brightness(0.98); }
+.btn-ghost{ background:#fff; }
+.btn-primary{ background:#0ea5e9; border-color:#0ea5e9; color:#fff; }
+.btn-primary:hover{ filter:brightness(0.96); }
+
+/* Backdrop (mantém seu padrão) */
+.modal-backdrop.open{ position:fixed; inset:0; background:rgba(15,23,42,.4); display:flex; align-items:flex-start; justify-content:center; padding:24px; z-index:999; }
+.modal-open{ overflow: hidden; }
+
+:root{ --modal-top-offset: 50px; }
+.modal-backdrop.open{
+  padding: var(--modal-top-offset) 24px 24px;
+}
+
+/* ===== Offset global no topo dos modais ===== */
+:root{ --modal-top-offset: 50px; }
+
+.modal-backdrop.open{
+  /* já está com align-items:flex-start; */
+  /* mantém seu padding como preferir; não é obrigatório mudar aqui */
+}
+
+.modal-backdrop.open .modal{
+  margin-top: var(--modal-top-offset);
+  /* mantém o respiro embaixo e evita que o modal estoure a tela */
+  max-height: calc(100vh - var(--modal-top-offset) - 24px);
+}
