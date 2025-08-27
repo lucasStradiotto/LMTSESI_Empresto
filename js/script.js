@@ -3,14 +3,18 @@
    - API wrapper
    - Modal base + Modais padrão (confirmModal / notifyModal)
    - Utils de data / hash
-   - Loader robusto (jsPDF / AutoTable / QRCode)
+   - Loader robusto OFFLINE-FIRST (jsPDF / AutoTable / QRCode)
    - Geração de PDF com logo + QR (empréstimo e devolução)
+   - Modal de QR com botão "Baixar PDF"
 */
 (function () {
+  'use strict';
+
   // Detecta se estamos em /views/
   const IN_VIEWS = location.pathname.includes('/views/');
   const API_BASE = IN_VIEWS ? '../php/' : 'php/';
   const ASSETS_BASE = IN_VIEWS ? '../assets/' : 'assets/';
+  const VENDOR = (IN_VIEWS ? '../' : '') + 'assets/vendor/';
 
   // ---------------------- Fetch JSON helper ----------------------
   async function j(url, options = {}) {
@@ -48,9 +52,8 @@
     const modal = backdrop.querySelector('.modal');
     const btnCancel = backdrop.querySelector('.m-cancel');
 
-    // 👉 garante offset de 50px no topo, mesmo que algum CSS tente sobrescrever
+    // offset 50px no topo + altura útil
     modal.style.marginTop = '50px';
-    // Ajusta a altura útil para compensar o offset
     modal.style.maxHeight = 'calc(100vh - 50px - 24px)';
 
     const close = () => {
@@ -75,7 +78,6 @@
     return { backdrop, modal, close };
   };
 
-
   // Ícones SVG por tipo (cores via CSS)
   function iconSVG(type) {
     const base = 'width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"';
@@ -87,9 +89,9 @@
       default: return `<svg ${base}><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>`;
     }
   }
+  window.iconSVG = iconSVG;
 
   // --------------------- Modal de Confirmação --------------------
-  // Uso: const ok = await confirmModal({ title, text, confirmText, cancelText, type })
   window.confirmModal = function ({ title = 'Confirmar', text = '', html = '', confirmText = 'Confirmar', cancelText = 'Cancelar', type = 'info' } = {}) {
     return new Promise(resolve => {
       const { backdrop, modal, close } = openModal(`
@@ -110,22 +112,15 @@
 
       const btnOk = backdrop.querySelector('.btn-confirm');
       const btnCancel = backdrop.querySelector('.m-cancel');
-
       const done = (val) => { close(); resolve(val); };
 
       btnOk.addEventListener('click', () => done(true));
       btnCancel.addEventListener('click', () => done(false));
-
-      // ENTER confirma, ESC cancela (ESC já tratado no openModal)
-      const key = (e) => {
-        if (e.key === 'Enter') { e.preventDefault(); done(true); }
-      };
-      backdrop.addEventListener('keydown', key, { once: true });
+      backdrop.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); done(true); } }, { once: true });
     });
   };
 
   // ----------------------- Modal de Aviso ------------------------
-  // Uso: await notifyModal({ title, text, html, type, okText, autoCloseMs })
   async function notifyModal({ title = 'Aviso', text = '', html = '', type = 'info', okText = 'OK', autoCloseMs = 0 } = {}) {
     return new Promise(resolve => {
       const { backdrop, modal, close } = openModal(`
@@ -146,15 +141,11 @@
       const done = () => { close(); resolve(true); };
       ok.addEventListener('click', done);
 
-      if (autoCloseMs && Number(autoCloseMs) > 0) {
-        setTimeout(done, Number(autoCloseMs));
-      }
-
-      // ENTER fecha
-      const key = (e) => { if (e.key === 'Enter') { e.preventDefault(); done(); } };
-      backdrop.addEventListener('keydown', key, { once: true });
+      if (autoCloseMs && Number(autoCloseMs) > 0) setTimeout(done, Number(autoCloseMs));
+      backdrop.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); done(); } }, { once: true });
     });
   }
+  window.notifyModal = notifyModal;
 
   // Substitui alert() global por notifyModal (padrão do sistema)
   window.alert = function (message) {
@@ -183,6 +174,7 @@
   window.loadLogoDataURL = function (url, maxW = 140, maxH = 60) {
     return new Promise(resolve => {
       const img = new Image();
+      img.crossOrigin = 'anonymous';
       img.onload = () => {
         const { naturalWidth: w, naturalHeight: h } = img;
         const ratio = Math.min(maxW / w, maxH / h, 1);
@@ -201,9 +193,13 @@
     return rec === 'notebooks' ? 'Notebook' : (rec === 'celulares' ? 'Celular' : 'Câmera');
   }
 
-  // -------------------- Loader jsPDF / Plugins --------------------
-  async function loadScript(src) {
+  // -------------------- Loaders (jsPDF / AutoTable / QR) ----------
+  function alreadyLoaded(sub) {
+    return Array.from(document.scripts).some(s => s.src && s.src.includes(sub));
+  }
+  function loadScript(src) {
     return new Promise((resolve, reject) => {
+      if (alreadyLoaded(src)) return resolve(true);
       const s = document.createElement('script');
       s.src = src;
       s.async = true;
@@ -214,22 +210,86 @@
     });
   }
 
+  async function ensureQRReady() {
+    // Se já tem (com adaptador), ok
+    if (window.QRCode?.toDataURL) return true;
+
+    const sources = [
+      VENDOR + 'qrcode.min.js',                                            // local (recomendado)
+      'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js',
+      'https://cdn.jsdelivr.net/npm/qrcodejs/qrcode.min.js'
+    ];
+
+    for (const src of sources) {
+      try {
+        await loadScript(src);
+        // se for QRCode.js (DavidShim), instalar adaptador .toDataURL()
+        if (!window.QRCode?.toDataURL && window.QRCode) {
+          window.QRCode.toDataURL = (text, { width = 220, margin = 1, errorCorrectionLevel = 'M' } = {}) => {
+            return new Promise((resolve) => {
+              const tmp = document.createElement('div');
+              tmp.style.position = 'fixed';
+              tmp.style.left = '-99999px';
+              document.body.appendChild(tmp);
+              const qropts = {
+                text,
+                width, height: width,
+                correctLevel: window.QRCode.CorrectLevel?.[errorCorrectionLevel] ?? window.QRCode.CorrectLevel.M
+              };
+              // eslint-disable-next-line no-new
+              new window.QRCode(tmp, qropts);
+              setTimeout(() => {
+                const canvas = tmp.querySelector('canvas');
+                let dataURL = '';
+                try { dataURL = canvas?.toDataURL('image/png') || ''; } catch {}
+                tmp.remove();
+                resolve(dataURL);
+              }, 0);
+            });
+          };
+        }
+        if (window.QRCode?.toDataURL) return true;
+      } catch (e) { /* tenta próximo */ }
+    }
+    throw new Error('QRCode lib indisponível');
+  }
+
   async function ensurePdfReady() {
-    // jsPDF
+    // jsPDF (local-first)
     if (!window.jspdf?.jsPDF) {
-      await loadScript('https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js');
+      try { await loadScript(VENDOR + 'jspdf.umd.min.js'); } catch {}
+    }
+    if (!window.jspdf?.jsPDF) {
+      try { await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'); } catch {}
     }
     if (!window.jspdf?.jsPDF) throw new Error('jsPDF não disponível');
 
-    // AutoTable (opcional, mas usamos)
+    // AutoTable
     if (!window.jspdf.jsPDF.API?.autoTable) {
-      await loadScript('https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js');
+      try { await loadScript(VENDOR + 'jspdf.plugin.autotable.min.js'); } catch {}
+    }
+    if (!window.jspdf.jsPDF.API?.autoTable) {
+      try { await loadScript('https://unpkg.com/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js'); } catch {}
     }
 
-    // QRCode (opcional; usado no PDF de empréstimo)
-    if (!window.QRCode) {
-      await loadScript('https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js');
-    }
+    // QR (opcional no PDF)
+    try { await ensureQRReady(); } catch {}
+  }
+
+  // --------- Fallback caso autoTable não esteja disponível --------
+  function drawItemsListFallback(doc, startY, tipoSing, itens) {
+    let y = startY + 8;
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
+    doc.text('Itens', 40, startY);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(11);
+
+    const lineH = 14, bottom = 800;
+    (itens || []).forEach((n) => {
+      if (y > bottom) { doc.addPage(); y = 60; }
+      doc.text(`• ${tipoSing} ${n}`, 48, y);
+      y += lineH;
+    });
+    return y + 4;
   }
 
   // ---------------------- PDF: Empréstimo -------------------------
@@ -305,11 +365,11 @@
       yPos -= 6;
     }
 
-    // Tabela itens
+    // Itens (AutoTable ou fallback)
     yPos += 20;
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
+    doc.text('Itens Emprestados', 40, yPos);
     if (doc.autoTable) {
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
-      doc.text('Itens Emprestados', 40, yPos);
       doc.autoTable({
         startY: yPos + 8,
         styles: { font: 'helvetica', fontSize: 10, cellPadding: 6 },
@@ -319,6 +379,8 @@
         margin: { left: 40, right: 40 }
       });
       yPos = doc.lastAutoTable.finalY || (yPos + 30);
+    } else {
+      yPos = drawItemsListFallback(doc, yPos + 20, tipoSing, mov.itens);
     }
 
     // QR + hash
@@ -331,10 +393,11 @@
     const hash = await sha256Hex(canonical);
     let qrDataURL = null;
     try {
+      await ensureQRReady(); // garante lib
       if (window.QRCode?.toDataURL) {
         qrDataURL = await window.QRCode.toDataURL(`EMPRESTIMO:${hash}`, { errorCorrectionLevel: 'M', margin: 1, width: 140 });
       }
-    } catch (e) { }
+    } catch (e) { /* sem QR, tudo bem */ }
 
     yPos += 30;
     const signY = Math.min(yPos, 720);
@@ -435,11 +498,11 @@
       yPos -= 6;
     }
 
-    // Tabela itens devolvidos
+    // Itens devolvidos (AutoTable ou fallback)
     yPos += 20;
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
+    doc.text('Itens Devolvidos', 40, yPos);
     if (doc.autoTable) {
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
-      doc.text('Itens Devolvidos', 40, yPos);
       doc.autoTable({
         startY: yPos + 8,
         styles: { font: 'helvetica', fontSize: 10, cellPadding: 6 },
@@ -449,6 +512,8 @@
         margin: { left: 40, right: 40 }
       });
       yPos = doc.lastAutoTable.finalY || (yPos + 30);
+    } else {
+      yPos = drawItemsListFallback(doc, yPos + 20, tipoSing, mov.itens);
     }
 
     // Hash simples
@@ -476,4 +541,96 @@
     const fname = `comprovante_devolucao_${tipoSing.toLowerCase()}_${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}_${p2(d.getHours())}-${p2(d.getMinutes())}.pdf`;
     doc.save(fname);
   };
+
+  // ---------------- Modal com QR (link + botão Baixar PDF) -------
+  window.showQRCodeModal = async function ({
+    url,
+    title = 'Comprovante',
+    subtitle = 'Escaneie para abrir o PDF',
+    copyHint = 'Toque para copiar o link',
+    onDownload = null // callback opcional que gera/baixa o PDF
+  }) {
+    try { await ensureQRReady(); } catch (e) {
+      await alert('Não foi possível carregar a biblioteca de QR Code.');
+      console.error(e); return;
+    }
+
+    let dataURL = '';
+    try {
+      dataURL = await window.QRCode.toDataURL(url, { errorCorrectionLevel: 'M', margin: 1, width: 220 });
+    } catch (e) { console.error(e); }
+
+    const { backdrop } = openModal(`
+      <div class="modal is-info" role="dialog" aria-modal="true" tabindex="-1">
+        <div class="modal-header">
+          <span class="modal-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                 focusable="false" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7"></rect>
+              <rect x="14" y="3" width="7" height="7"></rect>
+              <rect x="14" y="14" width="7" height="7"></rect>
+              <path d="M3 14h7v7H3z"></path>
+            </svg>
+          </span>
+          <h3 class="modal-title">${title}</h3>
+        </div>
+        <div class="modal-body" style="display:grid; gap:12px; text-align:center">
+          <div>${subtitle}</div>
+          <div style="display:flex; justify-content:center">
+            <img src="${dataURL}" alt="QR Code" style="width:220px;height:220px;border-radius:8px;box-shadow:0 6px 16px rgba(0,0,0,.12); background:#fff; padding:6px">
+          </div>
+          <div style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap">
+            <a href="${url}" target="_blank" class="btn btn-primary">Abrir relatório agora</a>
+            ${onDownload ? `<button type="button" class="btn" id="btn-download-pdf">Baixar PDF</button>` : ``}
+          </div>
+          <button type="button" class="btn btn-ghost" id="copy-link" title="${copyHint}" style="justify-self:center; max-width:90%; overflow:hidden; text-overflow:ellipsis">${url}</button>
+          <small class="muted">Compartilhe este QR/link para acessar o PDF em outro dispositivo.</small>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-primary m-cancel">Fechar</button>
+        </div>
+      </div>
+    `);
+
+    // Copiar link
+    backdrop.querySelector('#copy-link')?.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(url);
+        notifyModal({ title: 'Link copiado', text: 'O link do relatório foi copiado para a área de transferência.', type: 'success', autoCloseMs: 1200 });
+      } catch (e) { alert('Não foi possível copiar.'); }
+    });
+
+    // Baixar PDF (callback)
+    const btnDl = backdrop.querySelector('#btn-download-pdf');
+    if (btnDl && typeof onDownload === 'function') {
+      btnDl.addEventListener('click', async ()=>{
+        try { await onDownload(); }
+        catch (e) {
+          console.error('Falha ao gerar/baixar o PDF:', e);
+          await alert('Não foi possível gerar o PDF. Tente novamente.');
+        }
+      });
+    }
+  };
+
+  // Diagnóstico rápido (opcional)
+  window.pdfDiagnostics = async function () {
+    const hasJ = !!(window.jspdf?.jsPDF);
+    const hasT = !!(window.jspdf?.jsPDF?.API?.autoTable);
+    const hasQ = !!(window.QRCode && (window.QRCode.toDataURL || window.QRCode.CorrectLevel));
+    await notifyModal({
+      title: 'Diagnóstico PDF',
+      type: hasJ ? (hasT ? 'success' : 'warning') : 'danger',
+      html: `
+        <div style="display:grid;gap:8px">
+          <div><strong>jsPDF:</strong> ${hasJ ? 'OK ✅' : 'NÃO ❌'}</div>
+          <div><strong>AutoTable:</strong> ${hasT ? 'OK ✅' : 'AUSENTE ⚠️'}</div>
+          <div><strong>QRCode:</strong> ${hasQ ? 'OK ✅' : 'AUSENTE ⚠️'}</div>
+          <div><small>Preferência local: <code>${VENDOR}</code></small></div>
+        </div>
+      `
+    });
+  };
+
 })();

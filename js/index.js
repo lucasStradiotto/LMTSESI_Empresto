@@ -11,23 +11,22 @@
       SNAPSHOT = data;
       const c = data.counts;
 
-      // Atualiza "livres" (mantemos o texto completo na span: ex. "10/35 livres")
+      // Atualiza "livres"
       const setText = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
       setText('badge-note', `${c.notebooks.livres}/${c.notebooks.total} livres`);
       setText('badge-cel', `${c.celulares.livres}/${c.celulares.total} livres`);
       setText('badge-cam', `${c.cameras.livres}/${c.cameras.total} livres`);
 
-      // Atualiza apenas o número de manutenção (o rótulo "Em manutenção:" está no HTML)
+      // Atualiza manutenção
       const setManu = (id, n) => { const el = document.getElementById(id); if (el) el.textContent = String(n); };
       setManu('manu-note', c.notebooks.manutencao);
       setManu('manu-cel', c.celulares.manutencao);
       setManu('manu-cam', c.cameras.manutencao);
     } catch (e) {
-      console.error(e);
+      console.error('[index.js] snapshot erro:', e);
       alert('Falha ao carregar snapshot do servidor.');
     }
   }
-
 
   // ---------- Empréstimos Ativos (agrupados) ----------
   const elListNote = document.getElementById('al-notebooks');
@@ -78,7 +77,7 @@
   function groupCard(g) {
     const sing = prefixSing(g.recurso);
     const div = document.createElement('div');
-    div.className = 'al-card'; // compacto
+    div.className = 'al-card';
     div.innerHTML = `
       <div class="al-top">
         <strong class="al-nome">${g.nome || '(sem nome)'}</strong>
@@ -88,7 +87,6 @@
         <span class="badge item">${sing} × ${g.quantidade || (g.itens?.length || 0)}</span>
         <span class="al-date">Retirado: ${formatDateTimeBr(g.retirada_at)}</span>
       </div>
-
       <div class="al-tooltip">
         ${tooltipHTML(g)}
       </div>
@@ -116,7 +114,7 @@
       render(elListCel, A.celulares);
       render(elListCam, A.cameras);
     } catch (e) {
-      console.error(e);
+      console.error('[index.js] ativos erro:', e);
     }
   }
   btnRefreshAtivos?.addEventListener('click', refreshActiveLoans);
@@ -129,7 +127,7 @@
   // ---------- Helpers de seleção (wizard) ----------
   function optionsFor(tipo, mode) {
     if (!SNAPSHOT) return [];
-    const arr = SNAPSHOT.items[tipo] || [];
+    const arr = SNAPSHOT.items?.[tipo] || [];
     if (mode === 'loan') {
       return arr.filter(i => i.status === 'disponivel' && !Number(i.manutencao)).map(i => i.codigo);
     }
@@ -330,35 +328,57 @@
         const sucesso = res.emprestados || [];
         const jaOcup = res.ocupados || [];
         const bloque = res.manutencao || [];
+        const reqId  = res.req_id || '';
 
-        if (sucesso.length) {
-          const movBase = {
-            tipo: 'emprestimo',
-            categoria: state.categoria,
-            nome: state.nome,
-            recurso: state.tipo,
-            itens: sucesso,
-            turma: state.turma || '',
-            disciplina: state.disciplina || '',
-            atividade: state.atividade || '',
-            cargoSetor: state.cargoSetor || '',
-            email: state.email || '',
-            obs: state.obs || '',
-            at: new Date().toISOString()
-          };
-          await generateLoanPDF(movBase);
-        }
-
+        // Atualiza UI
         await refreshSnapshot();
         await refreshActiveLoans();
 
+        // Objeto base p/ PDF local
+        const movBase = {
+          tipo: 'emprestimo',
+          categoria: state.categoria,
+          nome: state.nome,
+          recurso: state.tipo,
+          itens: sucesso,
+          turma: state.turma || '',
+          disciplina: state.disciplina || '',
+          atividade: state.atividade || '',
+          cargoSetor: state.cargoSetor || '',
+          email: state.email || '',
+          obs: state.obs || '',
+          at: new Date().toISOString()
+        };
+
+        // Link relatório (se tiver endpoint)
+        const reportURL = (typeof API.relatorioURL === 'function')
+          ? API.relatorioURL({
+              tipo: 'emprestimo',
+              req_id: reqId,
+              recurso: state.tipo,
+              itens: Array.isArray(sucesso) ? sucesso.join(',') : ''
+            })
+          : '#';
+
+        // Modal QR + botão baixar PDF
+        await showQRCodeModal({
+          url: reportURL,
+          title: 'Comprovante de Empréstimo',
+          subtitle: 'Escaneie para abrir o relatório. Ou baixe o PDF agora:',
+          onDownload: async () => {
+            if (sucesso.length) await generateLoanPDF(movBase);
+            else await alert('Nenhum item foi emprestado.');
+          }
+        });
+
+        // Mensagem final
         let msg = [];
         if (sucesso.length) msg.push(`Emprestados: ${sucesso.join(', ')}`);
         if (jaOcup.length) msg.push(`Já ocupados: ${jaOcup.join(', ')}`);
         if (bloque.length) msg.push(`Em manutenção (bloqueados): ${bloque.join(', ')}`);
         alert(msg.join('\n') || 'Nada a registrar.');
       } catch (e) {
-        console.error(e);
+        console.error('[index.js] loan erro:', e);
         alert('Falha ao registrar empréstimo no servidor.');
       }
     }
@@ -387,7 +407,7 @@
       const A = data.ativos || { notebooks: [], celulares: [], cameras: [] };
       grupos = [...A.notebooks, ...A.celulares, ...A.cameras];
     } catch (e) {
-      console.error(e);
+      console.error('[index.js] activeLoans erro:', e);
       alert('Não foi possível carregar empréstimos ativos.');
       return;
     }
@@ -414,8 +434,8 @@
     const stepNum = backdrop.querySelector('#dev-step-num');
 
     const state = {
-      group: null,      // grupo selecionado (req_id + recurso + dados)
-      itensSel: []      // itens (códigos) escolhidos para devolver
+      group: null,      // grupo selecionado
+      itensSel: []      // itens (códigos) escolhidos p/ devolver
     };
 
     function renderStep1() {
@@ -426,7 +446,7 @@
       `;
       const cont = stepsEl.querySelector('.gsel');
 
-      grupos.forEach((g, idx) => {
+      grupos.forEach((g) => {
         const card = document.createElement('div');
         card.className = 'al-card';
         const sing = g.recurso === 'notebooks' ? 'Notebook' : (g.recurso === 'celulares' ? 'Celular' : 'Câmera');
@@ -506,26 +526,46 @@
         const ignorados = res.ja_livres || [];
         const at = new Date().toISOString();
 
-        // Gera PDF de devolução (com dados do solicitante e retirada original)
-        if (devolvidos.length) {
-          await generateReturnPDF({
-            recurso: g.recurso,
-            itens: devolvidos,
-            categoria: g.categoria,
-            nome: g.nome,
-            turma: g.turma || '',
-            disciplina: g.disciplina || '',
-            atividade: g.atividade || '',
-            cargoSetor: g.cargo_setor || '',
-            email: g.email || '',
-            obs: g.obs || '',
-            retirada_at: g.retirada_at,
-            at
-          });
-        }
-
+        // Atualiza UI
         await refreshSnapshot();
         await refreshActiveLoans();
+
+        // Objeto p/ PDF
+        const mov = {
+          recurso: g.recurso,
+          itens: devolvidos,
+          categoria: g.categoria,
+          nome: g.nome,
+          turma: g.turma || '',
+          disciplina: g.disciplina || '',
+          atividade: g.atividade || '',
+          cargoSetor: g.cargo_setor || '',
+          email: g.email || '',
+          obs: g.obs || '',
+          retirada_at: g.retirada_at,
+          at
+        };
+
+        // Link relatório (se endpoint existir)
+        const reportURL = (typeof API.relatorioURL === 'function')
+          ? API.relatorioURL({
+              tipo: 'devolucao',
+              req_id: g.req_id || '',
+              recurso: g.recurso,
+              itens: Array.isArray(devolvidos) ? devolvidos.join(',') : ''
+            })
+          : '#';
+
+        // Modal QR + botão baixar PDF
+        await showQRCodeModal({
+          url: reportURL,
+          title: 'Comprovante de Devolução',
+          subtitle: 'Escaneie para abrir o relatório. Ou baixe o PDF agora:',
+          onDownload: async () => {
+            if (devolvidos.length) await generateReturnPDF(mov);
+            else await alert('Nenhum item foi marcado como devolvido.');
+          }
+        });
 
         // Mensagem final
         const total = (g.itens || []).length;
@@ -536,7 +576,7 @@
         alert(msg.join('\n') || 'Nada a registrar.');
         close();
       } catch (e) {
-        console.error(e);
+        console.error('[index.js] devolver erro:', e);
         alert('Falha ao registrar devolução no servidor.');
       }
     }
@@ -562,7 +602,7 @@
     await refreshActiveLoans();
   });
 
-  // Torna os cards da Home clicáveis (e acessíveis via teclado)
+  // Cards clicáveis (Home)
   document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.card.clickable[data-href]').forEach(card => {
       const go = () => {
