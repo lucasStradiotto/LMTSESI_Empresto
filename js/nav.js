@@ -8,7 +8,7 @@
   header.className = 'site-nav';
   header.innerHTML = `
     <div class="brand">
-      <img src="${rootPrefix}/assets/icons/logo.png" alt="Logo">
+      <img id="coruja" src="${rootPrefix}/assets/icons/owl_244352.png" alt="Logo">
       <strong>LMT SESI</strong>
     </div>
     <nav class="menu">

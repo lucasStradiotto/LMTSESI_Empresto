@@ -16,6 +16,19 @@
   const ASSETS_BASE = IN_VIEWS ? '../assets/' : 'assets/';
   const VENDOR = (IN_VIEWS ? '../' : '') + 'assets/vendor/';
 
+  // Converte qualquer URL (até relativa) em ABSOLUTA, baseada na página atual
+  function toAbsoluteURL(u) {
+    try {
+      // Se você tiver um domínio/IP público estável, pode setar:
+      // window.PUBLIC_BASE_URL = 'http://192.168.0.50/LMTSESI_EMPRESTO/';
+      if (window.PUBLIC_BASE_URL && !/^https?:\/\//i.test(u)) {
+        return new URL(u, window.PUBLIC_BASE_URL).href;
+      }
+      return new URL(u, location.href).href; // fallback: resolve relativo contra a página atual
+    } catch { return u; }
+  }
+
+
   // ---------------------- Fetch JSON helper ----------------------
   async function j(url, options = {}) {
     const r = await fetch(API_BASE + url, {
@@ -241,7 +254,7 @@
               setTimeout(() => {
                 const canvas = tmp.querySelector('canvas');
                 let dataURL = '';
-                try { dataURL = canvas?.toDataURL('image/png') || ''; } catch {}
+                try { dataURL = canvas?.toDataURL('image/png') || ''; } catch { }
                 tmp.remove();
                 resolve(dataURL);
               }, 0);
@@ -257,23 +270,23 @@
   async function ensurePdfReady() {
     // jsPDF (local-first)
     if (!window.jspdf?.jsPDF) {
-      try { await loadScript(VENDOR + 'jspdf.umd.min.js'); } catch {}
+      try { await loadScript(VENDOR + 'jspdf.umd.min.js'); } catch { }
     }
     if (!window.jspdf?.jsPDF) {
-      try { await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'); } catch {}
+      try { await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'); } catch { }
     }
     if (!window.jspdf?.jsPDF) throw new Error('jsPDF não disponível');
 
     // AutoTable
     if (!window.jspdf.jsPDF.API?.autoTable) {
-      try { await loadScript(VENDOR + 'jspdf.plugin.autotable.min.js'); } catch {}
+      try { await loadScript(VENDOR + 'jspdf.plugin.autotable.min.js'); } catch { }
     }
     if (!window.jspdf.jsPDF.API?.autoTable) {
-      try { await loadScript('https://unpkg.com/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js'); } catch {}
+      try { await loadScript('https://unpkg.com/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js'); } catch { }
     }
 
     // QR (opcional no PDF)
-    try { await ensureQRReady(); } catch {}
+    try { await ensureQRReady(); } catch { }
   }
 
   // --------- Fallback caso autoTable não esteja disponível --------
@@ -309,7 +322,7 @@
     const safe = v => (v == null ? '' : String(v));
 
     let yPos = 40;
-    const logo = await loadLogoDataURL(ASSETS_BASE + 'icons/logo.png', 140, 60);
+    const logo = await loadLogoDataURL(ASSETS_BASE + 'icons/owl_244352.png', 140, 60);
     if (logo) {
       const xRight = 555;
       doc.addImage(logo.dataURL, 'PNG', xRight - logo.w, yPos - 20, logo.w, logo.h);
@@ -365,11 +378,11 @@
       yPos -= 6;
     }
 
-    // Itens (AutoTable ou fallback)
+    // Tabela de itens (usa AutoTable se disponível)
     yPos += 20;
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
-    doc.text('Itens Emprestados', 40, yPos);
     if (doc.autoTable) {
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
+      doc.text('Itens Emprestados', 40, yPos);
       doc.autoTable({
         startY: yPos + 8,
         styles: { font: 'helvetica', fontSize: 10, cellPadding: 6 },
@@ -379,11 +392,9 @@
         margin: { left: 40, right: 40 }
       });
       yPos = doc.lastAutoTable.finalY || (yPos + 30);
-    } else {
-      yPos = drawItemsListFallback(doc, yPos + 20, tipoSing, mov.itens);
     }
 
-    // QR + hash
+    // Hash simples (sem QR no PDF)
     const payload = {
       at: mov.at, cat: mov.categoria, nome: mov.nome, rec: mov.recurso, itens: mov.itens,
       turma: mov.turma || '', disc: mov.disciplina || '', ativ: mov.atividade || '',
@@ -391,14 +402,8 @@
     };
     const canonical = JSON.stringify(payload);
     const hash = await sha256Hex(canonical);
-    let qrDataURL = null;
-    try {
-      await ensureQRReady(); // garante lib
-      if (window.QRCode?.toDataURL) {
-        qrDataURL = await window.QRCode.toDataURL(`EMPRESTIMO:${hash}`, { errorCorrectionLevel: 'M', margin: 1, width: 140 });
-      }
-    } catch (e) { /* sem QR, tudo bem */ }
 
+    // Assinaturas
     yPos += 30;
     const signY = Math.min(yPos, 720);
     doc.setDrawColor(0, 0, 0);
@@ -407,23 +412,17 @@
     doc.line(340, signY, 540, signY);
     doc.text('Assinatura do Responsável', 340, signY + 14);
 
-    if (qrDataURL) {
-      const qrSize = 110;
-      const qrX = 555 - qrSize;
-      const qrY = signY - qrSize - 10;
-      doc.addImage(qrDataURL, 'PNG', qrX, qrY, qrSize, qrSize);
-      doc.setFontSize(9); doc.setTextColor(80);
-      doc.text(`Hash: ${hash.slice(0, 16)}…`, qrX, qrY + qrSize + 12);
-    }
-
+    // Rodapé: Hash + mensagem
     doc.setFontSize(9); doc.setTextColor(100);
-    doc.text('Gerado automaticamente pelo sistema de empréstimos', 40, 810);
+    doc.text(`Hash: ${hash.slice(0, 16)}…`, 40, 810);
+    doc.text('Gerado automaticamente pelo sistema de empréstimos', 160, 810);
 
     const d = mov.at ? new Date(mov.at) : new Date();
     const p2 = n => String(n).padStart(2, '0');
     const fname = `comprovante_emprestimo_${tipoSing.toLowerCase()}_${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}_${p2(d.getHours())}-${p2(d.getMinutes())}.pdf`;
     doc.save(fname);
   };
+
 
   // ---------------------- PDF: Devolução --------------------------
   window.generateReturnPDF = async function (mov) {
@@ -442,7 +441,7 @@
     const safe = v => (v == null ? '' : String(v));
 
     let yPos = 40;
-    const logo = await loadLogoDataURL(ASSETS_BASE + 'icons/logo.png', 140, 60);
+    const logo = await loadLogoDataURL(ASSETS_BASE + 'icons/owl_244352.png', 140, 60);
     if (logo) {
       const xRight = 555;
       doc.addImage(logo.dataURL, 'PNG', xRight - logo.w, yPos - 20, logo.w, logo.h);
@@ -550,6 +549,7 @@
     copyHint = 'Toque para copiar o link',
     onDownload = null // callback opcional que gera/baixa o PDF
   }) {
+    const target = toAbsoluteURL(url);
     try { await ensureQRReady(); } catch (e) {
       await alert('Não foi possível carregar a biblioteca de QR Code.');
       console.error(e); return;
@@ -557,7 +557,7 @@
 
     let dataURL = '';
     try {
-      dataURL = await window.QRCode.toDataURL(url, { errorCorrectionLevel: 'M', margin: 1, width: 220 });
+      dataURL = await window.QRCode.toDataURL(target, { errorCorrectionLevel: 'M', margin: 1, width: 220 });
     } catch (e) { console.error(e); }
 
     const { backdrop } = openModal(`
@@ -581,10 +581,10 @@
             <img src="${dataURL}" alt="QR Code" style="width:220px;height:220px;border-radius:8px;box-shadow:0 6px 16px rgba(0,0,0,.12); background:#fff; padding:6px">
           </div>
           <div style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap">
-            <a href="${url}" target="_blank" class="btn btn-primary">Abrir relatório agora</a>
+            <a href="${target}" target="_blank" class="btn btn-primary">Abrir relatório agora</a>
             ${onDownload ? `<button type="button" class="btn" id="btn-download-pdf">Baixar PDF</button>` : ``}
           </div>
-          <button type="button" class="btn btn-ghost" id="copy-link" title="${copyHint}" style="justify-self:center; max-width:90%; overflow:hidden; text-overflow:ellipsis">${url}</button>
+          <button type="button" class="btn btn-ghost" id="copy-link" title="${copyHint}" style="justify-self:center; max-width:90%; overflow:hidden; text-overflow:ellipsis">${target}</button>
           <small class="muted">Compartilhe este QR/link para acessar o PDF em outro dispositivo.</small>
         </div>
         <div class="modal-actions">
@@ -593,18 +593,57 @@
       </div>
     `);
 
-    // Copiar link
     backdrop.querySelector('#copy-link')?.addEventListener('click', async () => {
+      const el = backdrop.querySelector('#copy-link');
+      const text = el?.textContent?.trim() || '';
+
+      // 1) Tenta Clipboard API moderna (funciona em HTTPS / localhost)
       try {
-        await navigator.clipboard.writeText(url);
-        notifyModal({ title: 'Link copiado', text: 'O link do relatório foi copiado para a área de transferência.', type: 'success', autoCloseMs: 1200 });
-      } catch (e) { alert('Não foi possível copiar.'); }
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(text);
+          await notifyModal({ title: 'Link copiado', text: 'O link do relatório foi copiado para a área de transferência.', type: 'success', autoCloseMs: 1200 });
+          return;
+        }
+      } catch (e) {
+        // continua pro fallback
+      }
+
+      // 2) Fallback clássico: textarea temporário + execCommand
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.top = '-2000px';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        const ok = document.execCommand('copy'); // alguns browsers antigos ainda permitem
+        document.body.removeChild(ta);
+        if (ok) {
+          await notifyModal({ title: 'Link copiado', text: 'Copiado via fallback.', type: 'success', autoCloseMs: 1200 });
+          return;
+        }
+      } catch (e) {
+        // continua
+      }
+
+      // 3) Último recurso: seleciona o próprio botão para o usuário copiar manualmente
+      try {
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+      } catch { }
+      await alert('Não foi possível copiar automaticamente. O link foi selecionado; use Ctrl/Cmd+C.');
     });
+
 
     // Baixar PDF (callback)
     const btnDl = backdrop.querySelector('#btn-download-pdf');
     if (btnDl && typeof onDownload === 'function') {
-      btnDl.addEventListener('click', async ()=>{
+      btnDl.addEventListener('click', async () => {
         try { await onDownload(); }
         catch (e) {
           console.error('Falha ao gerar/baixar o PDF:', e);

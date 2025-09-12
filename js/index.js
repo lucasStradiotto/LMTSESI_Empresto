@@ -1,7 +1,11 @@
 /* Home: snapshot (badges), wizards Emprestar/Devolver e Empréstimos Ativos (compacto por req_id) */
 (function () {
+  const __IN_VIEWS__ = location.pathname.includes('/views/');
+  const PHP_BASE = __IN_VIEWS__ ? '../php/' : 'php/';
   const BTN_ABRIR_EMP = document.getElementById('btn-abrir-emprestar');
   const BTN_ABRIR_DEV = document.getElementById('btn-abrir-devolver');
+  // Base local para endpoints PHP (igual à lógica do script.js)
+
 
   let SNAPSHOT = null;
 
@@ -328,7 +332,7 @@
         const sucesso = res.emprestados || [];
         const jaOcup = res.ocupados || [];
         const bloque = res.manutencao || [];
-        const reqId  = res.req_id || '';
+        const reqId = res.req_id || '';
 
         // Atualiza UI
         await refreshSnapshot();
@@ -350,15 +354,38 @@
           at: new Date().toISOString()
         };
 
-        // Link relatório (se tiver endpoint)
-        const reportURL = (typeof API.relatorioURL === 'function')
-          ? API.relatorioURL({
-              tipo: 'emprestimo',
-              req_id: reqId,
-              recurso: state.tipo,
-              itens: Array.isArray(sucesso) ? sucesso.join(',') : ''
-            })
-          : '#';
+        await generateLoanPDF(movBase);
+
+        // Link relatório (servidor retorna URL ABSOLUTA via format=json)
+        // Incluímos os dados do solicitante na query (viewer gera o PDF no celular)
+        let reportURL = '#';
+        try {
+          const params = {
+            format: 'json',
+            tipo: 'emprestimo',
+            rec: state.tipo,
+            itens: Array.isArray(sucesso) ? sucesso.join(',') : '',
+            req_id: reqId || '',
+            // extras para o viewer:
+            cat: state.categoria || '',
+            nome: state.nome || '',
+            turma: state.turma || '',
+            disciplina: state.disciplina || '',
+            atividade: state.atividade || '',
+            cargoSetor: state.cargoSetor || '',
+            email: state.email || '',
+            obs: state.obs || '',
+            at: new Date().toISOString()
+          };
+          const urlJson = PHP_BASE + 'api_relatorio.php?' + new URLSearchParams(params).toString();
+          const resp = await fetch(urlJson).then(r => r.json());
+          reportURL = resp?.url || '#';
+        } catch (e) {
+          console.warn('[index.js] relatorioURL json fallback:', e);
+          reportURL = '#';
+        }
+
+
 
         // Modal QR + botão baixar PDF
         await showQRCodeModal({
@@ -415,8 +442,21 @@
     const { backdrop, close } = openModal(`
       <div class="modal" role="dialog" aria-modal="true" aria-labelledby="dev-title">
         <style>
-          .gsel .al-card{cursor:pointer;margin-bottom:8px}
-          .gsel .al-card.selected{box-shadow:0 0 0 3px rgba(14,165,233,.3), var(--shadow); border-color:#0ea5e9}
+          .gsel .al-card{
+            cursor:pointer;
+            margin-bottom:8px;
+            position:relative; /* garante contexto p/ qualquer overlay */
+          }
+          .gsel .al-card.selected{
+            box-shadow:0 0 0 3px rgba(14,165,233,.3), var(--shadow);
+            border-color:#0ea5e9
+          }
+          /* 🚫 Desliga tooltip só neste modal (lista de grupos para devolução) */
+          .gsel .al-card .al-tooltip{
+            display:none !important;
+            visibility:hidden !important;
+            pointer-events:none !important;
+          }
         </style>
         <h3 id="dev-title">Devolver — Passo <span id="dev-step-num">1</span> de 2</h3>
         <div id="dev-steps"></div>
@@ -546,15 +586,38 @@
           at
         };
 
-        // Link relatório (se endpoint existir)
-        const reportURL = (typeof API.relatorioURL === 'function')
-          ? API.relatorioURL({
-              tipo: 'devolucao',
-              req_id: g.req_id || '',
-              recurso: g.recurso,
-              itens: Array.isArray(devolvidos) ? devolvidos.join(',') : ''
-            })
-          : '#';
+        await generateReturnPDF(mov);
+
+        // Link relatório (servidor retorna URL ABSOLUTA via format=json)
+        let reportURL = '#';
+        try {
+          const params = {
+            format: 'json',
+            tipo: 'devolucao',
+            rec: g.recurso,
+            itens: Array.isArray(devolvidos) ? devolvidos.join(',') : '',
+            req_id: g.req_id || '',
+            // extras para o viewer:
+            cat: g.categoria || '',
+            nome: g.nome || '',
+            turma: g.turma || '',
+            disciplina: g.disciplina || '',
+            atividade: g.atividade || '',
+            cargoSetor: g.cargo_setor || '',
+            email: g.email || '',
+            obs: g.obs || '',
+            retirada_at: g.retirada_at || '',
+            at
+          };
+          const urlJson = PHP_BASE + 'api_relatorio.php?' + new URLSearchParams(params).toString();
+          const resp = await fetch(urlJson).then(r => r.json());
+          reportURL = resp?.url || '#';
+        } catch (e) {
+          console.warn('[index.js] relatorioURL json fallback (devolucao):', e);
+          reportURL = '#';
+        }
+
+
 
         // Modal QR + botão baixar PDF
         await showQRCodeModal({

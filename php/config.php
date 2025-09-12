@@ -19,3 +19,7 @@ function tableName(string $recurso): string {
   return $map[$recurso];
 }
 header('Content-Type: application/json; charset=utf-8');
+// Ex.: IP da máquina no LAN + pasta do projeto
+// define('PUBLIC_BASE_URL', 'http://10.117.198.199/LMTSESI_EMPRESTO/');
+define('PUBLIC_BASE_URL', 'http://10.117.198.147/LMTSESI_EMPRESTO/');
+
