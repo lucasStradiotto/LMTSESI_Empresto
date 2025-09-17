@@ -1,8 +1,16 @@
+-- ==============================
+-- SCHEMA: lab_emprestimos
+-- ==============================
+
 CREATE DATABASE IF NOT EXISTS lab_emprestimos
-  CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+  CHARACTER SET utf8mb4
+  COLLATE utf8mb4_0900_ai_ci;
 USE lab_emprestimos;
 
-CREATE TABLE notebook (
+-- ------------------------------
+-- Tabelas de Itens
+-- ------------------------------
+CREATE TABLE IF NOT EXISTS notebook (
   id INT AUTO_INCREMENT PRIMARY KEY,
   codigo INT NOT NULL,
   patrimonio VARCHAR(64) UNIQUE,
@@ -13,9 +21,9 @@ CREATE TABLE notebook (
   UNIQUE KEY uq_notebook_codigo (codigo),
   KEY idx_notebook_status (status),
   KEY idx_notebook_manut (manutencao)
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE celular (
+CREATE TABLE IF NOT EXISTS celular (
   id INT AUTO_INCREMENT PRIMARY KEY,
   codigo INT NOT NULL,
   patrimonio VARCHAR(64) UNIQUE,
@@ -26,9 +34,9 @@ CREATE TABLE celular (
   UNIQUE KEY uq_celular_codigo (codigo),
   KEY idx_celular_status (status),
   KEY idx_celular_manut (manutencao)
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE camera (
+CREATE TABLE IF NOT EXISTS camera (
   id INT AUTO_INCREMENT PRIMARY KEY,
   codigo INT NOT NULL,
   patrimonio VARCHAR(64) UNIQUE,
@@ -39,25 +47,33 @@ CREATE TABLE camera (
   UNIQUE KEY uq_camera_codigo (codigo),
   KEY idx_camera_status (status),
   KEY idx_camera_manut (manutencao)
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE movimentos (
+-- ------------------------------
+-- Movimentos (log de ações)
+-- ------------------------------
+CREATE TABLE IF NOT EXISTS movimentos (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  -- ID do pedido (mesmo para vários itens do mesmo empréstimo/devolução)
+  req_id VARCHAR(64) NULL,
   recurso ENUM('notebooks','celulares','cameras') NOT NULL,
   codigo INT NOT NULL,
   tipo ENUM('emprestimo','devolucao','manut_on','manut_off') NOT NULL,
   payload JSON NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_mov_req (req_id),
   KEY idx_mov_recurso_codigo (recurso, codigo),
   KEY idx_mov_tipo (tipo)
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-
--- Cria/recupera a view usada pela home para listar empréstimos ativos agrupados
+-- ------------------------------------------------------------------
+-- VIEW: Empréstimos ativos (agrupamento usa req_id no backend)
+-- Mostra itens cujo status atual ainda é 'ocupado'
+-- ------------------------------------------------------------------
 DROP VIEW IF EXISTS vw_emprestimos_ativos;
 
 CREATE VIEW vw_emprestimos_ativos AS
-/* NOTEBOKS ATIVOS (status ainda 'ocupado') */
+/* NOTEBOOKS ATIVOS */
 SELECT
   m.req_id,
   m.recurso,                   -- 'notebooks'
