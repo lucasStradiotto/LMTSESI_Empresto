@@ -51,3 +51,84 @@ CREATE TABLE movimentos (
   KEY idx_mov_recurso_codigo (recurso, codigo),
   KEY idx_mov_tipo (tipo)
 ) ENGINE=InnoDB;
+
+
+-- Cria/recupera a view usada pela home para listar empréstimos ativos agrupados
+DROP VIEW IF EXISTS vw_emprestimos_ativos;
+
+CREATE VIEW vw_emprestimos_ativos AS
+/* NOTEBOKS ATIVOS (status ainda 'ocupado') */
+SELECT
+  m.req_id,
+  m.recurso,                   -- 'notebooks'
+  m.codigo,                    -- número do item
+  n.patrimonio,
+  m.created_at AS retirada_at, -- data/hora do empréstimo
+  JSON_UNQUOTE(JSON_EXTRACT(m.payload,'$.nome'))        AS nome,
+  JSON_UNQUOTE(JSON_EXTRACT(m.payload,'$.categoria'))   AS categoria,
+  JSON_UNQUOTE(JSON_EXTRACT(m.payload,'$.turma'))       AS turma,
+  JSON_UNQUOTE(JSON_EXTRACT(m.payload,'$.disciplina'))  AS disciplina,
+  JSON_UNQUOTE(JSON_EXTRACT(m.payload,'$.atividade'))   AS atividade,
+  COALESCE(
+    JSON_UNQUOTE(JSON_EXTRACT(m.payload,'$.cargoSetor')),
+    JSON_UNQUOTE(JSON_EXTRACT(m.payload,'$.cargo_setor'))
+  ) AS cargo_setor,
+  JSON_UNQUOTE(JSON_EXTRACT(m.payload,'$.email'))       AS email,
+  JSON_UNQUOTE(JSON_EXTRACT(m.payload,'$.obs'))         AS obs
+FROM movimentos m
+JOIN notebook n ON n.codigo = m.codigo
+WHERE m.recurso = 'notebooks'
+  AND m.tipo    = 'emprestimo'
+  AND n.status  = 'ocupado'
+
+UNION ALL
+
+/* CELULARES ATIVOS */
+SELECT
+  m.req_id,
+  m.recurso,                   -- 'celulares'
+  m.codigo,
+  c.patrimonio,
+  m.created_at AS retirada_at,
+  JSON_UNQUOTE(JSON_EXTRACT(m.payload,'$.nome'))        AS nome,
+  JSON_UNQUOTE(JSON_EXTRACT(m.payload,'$.categoria'))   AS categoria,
+  JSON_UNQUOTE(JSON_EXTRACT(m.payload,'$.turma'))       AS turma,
+  JSON_UNQUOTE(JSON_EXTRACT(m.payload,'$.disciplina'))  AS disciplina,
+  JSON_UNQUOTE(JSON_EXTRACT(m.payload,'$.atividade'))   AS atividade,
+  COALESCE(
+    JSON_UNQUOTE(JSON_EXTRACT(m.payload,'$.cargoSetor')),
+    JSON_UNQUOTE(JSON_EXTRACT(m.payload,'$.cargo_setor'))
+  ) AS cargo_setor,
+  JSON_UNQUOTE(JSON_EXTRACT(m.payload,'$.email'))       AS email,
+  JSON_UNQUOTE(JSON_EXTRACT(m.payload,'$.obs'))         AS obs
+FROM movimentos m
+JOIN celular c ON c.codigo = m.codigo
+WHERE m.recurso = 'celulares'
+  AND m.tipo    = 'emprestimo'
+  AND c.status  = 'ocupado'
+
+UNION ALL
+
+/* CÂMERAS ATIVAS */
+SELECT
+  m.req_id,
+  m.recurso,                   -- 'cameras'
+  m.codigo,
+  ca.patrimonio,
+  m.created_at AS retirada_at,
+  JSON_UNQUOTE(JSON_EXTRACT(m.payload,'$.nome'))        AS nome,
+  JSON_UNQUOTE(JSON_EXTRACT(m.payload,'$.categoria'))   AS categoria,
+  JSON_UNQUOTE(JSON_EXTRACT(m.payload,'$.turma'))       AS turma,
+  JSON_UNQUOTE(JSON_EXTRACT(m.payload,'$.disciplina'))  AS disciplina,
+  JSON_UNQUOTE(JSON_EXTRACT(m.payload,'$.atividade'))   AS atividade,
+  COALESCE(
+    JSON_UNQUOTE(JSON_EXTRACT(m.payload,'$.cargoSetor')),
+    JSON_UNQUOTE(JSON_EXTRACT(m.payload,'$.cargo_setor'))
+  ) AS cargo_setor,
+  JSON_UNQUOTE(JSON_EXTRACT(m.payload,'$.email'))       AS email,
+  JSON_UNQUOTE(JSON_EXTRACT(m.payload,'$.obs'))         AS obs
+FROM movimentos m
+JOIN camera ca ON ca.codigo = m.codigo
+WHERE m.recurso = 'cameras'
+  AND m.tipo    = 'emprestimo'
+  AND ca.status = 'ocupado';
