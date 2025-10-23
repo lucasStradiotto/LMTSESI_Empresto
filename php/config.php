@@ -3,6 +3,7 @@
 $DB_HOST = '127.0.0.1';
 $DB_NAME = 'lab_emprestimos';
 $DB_USER = 'root';
+$DB_PORT = 3307;
 $DB_PASS = '';
 
 $dsn = "mysql:host=$DB_HOST;dbname=$DB_NAME;charset=utf8mb4";
