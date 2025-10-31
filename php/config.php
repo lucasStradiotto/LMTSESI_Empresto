@@ -1,9 +1,9 @@
 <?php
 // Ajuste as credenciais abaixo para o seu MySQL.
-$DB_HOST = '127.0.0.1';
+$DB_HOST = 'localhost';
 $DB_NAME = 'lab_emprestimos';
 $DB_USER = 'root';
-$DB_PORT = 3307;
+$DB_PORT = 3306;
 $DB_PASS = '';
 
 $dsn = "mysql:host=$DB_HOST;dbname=$DB_NAME;charset=utf8mb4";
@@ -21,6 +21,6 @@ function tableName(string $recurso): string {
 }
 header('Content-Type: application/json; charset=utf-8');
 // Ex.: IP da máquina no LAN + pasta do projeto
-define('PUBLIC_BASE_URL', 'http://10.117.198.199/LMTSESI_EMPRESTO/');
+define('PUBLIC_BASE_URL', 'http://10.117.198.147/LMTSESI_EMPRESTO/');
 // define('PUBLIC_BASE_URL', 'http://10.117.198.147/LMTSESI_EMPRESTO/');
 
