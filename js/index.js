@@ -2,10 +2,9 @@
 (function () {
   const __IN_VIEWS__ = location.pathname.includes('/views/');
   const PHP_BASE = __IN_VIEWS__ ? '../php/' : 'php/';
+
   const BTN_ABRIR_EMP = document.getElementById('btn-abrir-emprestar');
   const BTN_ABRIR_DEV = document.getElementById('btn-abrir-devolver');
-  // Base local para endpoints PHP (igual à lógica do script.js)
-
 
   let SNAPSHOT = null;
 
@@ -15,13 +14,11 @@
       SNAPSHOT = data;
       const c = data.counts;
 
-      // Atualiza "livres"
       const setText = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
       setText('badge-note', `${c.notebooks.livres}/${c.notebooks.total} livres`);
       setText('badge-cel', `${c.celulares.livres}/${c.celulares.total} livres`);
       setText('badge-cam', `${c.cameras.livres}/${c.cameras.total} livres`);
 
-      // Atualiza manutenção
       const setManu = (id, n) => { const el = document.getElementById(id); if (el) el.textContent = String(n); };
       setManu('manu-note', c.notebooks.manutencao);
       setManu('manu-cel', c.celulares.manutencao);
@@ -99,11 +96,46 @@
     return div;
   }
 
+  // Remove grupos duplicados num intervalo curto (ex.: 60s)
+  // Critério de "igualdade": mesmo recurso + mesmo conjunto de códigos + mesmo nome (opcional)
+  // Mantém o mais recente (retirada_at maior)
+  function dedupeGroups(arr, windowMs = 60_000) {
+    if (!Array.isArray(arr) || arr.length === 0) return arr;
+    // ordena do mais novo pro mais antigo
+    const sorted = [...arr].sort((a, b) => new Date(b.retirada_at) - new Date(a.retirada_at));
+
+    const seen = [];
+    const keep = [];
+
+    const makeKey = (g) => {
+      const cods = (g.itens || []).map(it => Number(it.codigo)).sort((x, y) => x - y).join(',');
+      // usa nome se houver (para diferenciar pedidos de pessoas diferentes no mesmo minuto)
+      return `${g.recurso}|${cods}|${(g.nome || '').trim().toLowerCase()}`;
+    };
+
+    for (const g of sorted) {
+      const k = makeKey(g);
+      const t = new Date(g.retirada_at).getTime();
+      const dupe = seen.find(s => s.key === k && Math.abs(t - s.time) <= windowMs);
+      if (!dupe) {
+        keep.push(g);
+        seen.push({ key: k, time: t });
+      }
+    }
+    // volta à ordem original (opcional). Se quiser manter do mais novo ao mais antigo, retorne keep como está.
+    return keep.reverse();
+  }
+
+
   async function refreshActiveLoans() {
     try {
       const data = await API.activeLoans(); // grupos
       const A = data.ativos || { notebooks: [], celulares: [], cameras: [] };
 
+      // NOVO: dedupe de grupos dentro de 60s
+      A.notebooks = dedupeGroups(A.notebooks, 60_000);
+      A.celulares = dedupeGroups(A.celulares, 60_000);
+      A.cameras = dedupeGroups(A.cameras, 60_000);
       const render = (el, arr) => {
         if (!el) return;
         el.innerHTML = '';
@@ -141,6 +173,19 @@
     return [];
   }
 
+  // ---- Verificações diretas no servidor (anti-stale) ----
+  async function fetchDisponiveis(tipo) {
+    const data = await API.getItems(tipo);
+    const arr = (data && data.data) || [];
+    return arr.filter(i => i.status === 'disponivel' && !Number(i.manutencao)).map(i => Number(i.codigo));
+  }
+
+  async function fetchOcupados(tipo) {
+    const data = await API.getItems(tipo);
+    const arr = (data && data.data) || [];
+    return arr.filter(i => i.status === 'ocupado').map(i => Number(i.codigo));
+  }
+
   /* ---- Wizard EMPRESTAR ---- */
   BTN_ABRIR_EMP?.addEventListener('click', () => {
     const state = {
@@ -153,7 +198,7 @@
       obs: ''
     };
 
-    const { backdrop, close } = openModal(`
+    const { backdrop, close: closeEmpModal } = openModal(`
       <div class="modal" role="dialog" aria-modal="true" aria-labelledby="emp-title">
         <h3 id="emp-title">Emprestar — Passo <span id="emp-passos-num">1</span> de 3</h3>
         <div id="emp-steps"></div>
@@ -163,7 +208,6 @@
         </div>
       </div>
     `);
-
     const stepsEl = backdrop.querySelector('#emp-steps');
     const btnBack = backdrop.querySelector('.m-back');
     const btnNext = backdrop.querySelector('.m-next');
@@ -263,53 +307,104 @@
 
     function renderStep3() {
       stepsEl.innerHTML = `
-        <form id="emp-step3">
-          <div style="display:grid; gap:10px; margin:10px 0 6px">
-            <div style="display:grid; gap:6px">
-              <label>Recurso</label>
-              <select name="tipo" id="emp-tipo" class="inp" required>
-                <option value="notebooks">Notebooks</option>
-                <option value="celulares">Celulares</option>
-                <option value="cameras">Câmeras</option>
-              </select>
-            </div>
-            <div style="display:grid; gap:6px">
-              <label>Itens disponíveis</label>
-              <div id="emp-grid" class="checks-grid" aria-live="polite"></div>
-              <small style="color:#475569">Aparecem apenas itens livres (não ocupados e não em manutenção).</small>
-            </div>
-            <textarea name="obs" class="inp" placeholder="Observações (opcional)"></textarea>
+    <form id="emp-step3">
+      <div style="display:grid; gap:10px; margin:10px 0 6px">
+        <div style="display:grid; gap:6px">
+          <label>Recurso</label>
+          <select name="tipo" id="emp-tipo" class="inp" required>
+            <option value="notebooks">Notebooks</option>
+            <option value="celulares">Celulares</option>
+            <option value="cameras">Câmeras</option>
+          </select>
+        </div>
+
+        <div style="display:grid; gap:6px">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px">
+            <label style="margin:0">Itens disponíveis</label>
+            <button type="button" id="btn-select-all" class="btn btn-outline" style="padding:6px 10px">Selecionar todos</button>
           </div>
-        </form>
-      `;
+          <div id="emp-grid" class="checks-grid" aria-live="polite"></div>
+          <small style="color:#475569">Aparecem apenas itens livres (não ocupados e não em manutenção). A lista é verificada em tempo real.</small>
+        </div>
+
+        <textarea name="obs" class="inp" placeholder="Observações (opcional)"></textarea>
+      </div>
+    </form>
+  `;
+
       const selTipo = stepsEl.querySelector('#emp-tipo');
       const grid = stepsEl.querySelector('#emp-grid');
       const obs = stepsEl.querySelector('textarea[name="obs"]');
-      selTipo.value = state.tipo || 'notebooks';
+      const btnSelectAll = stepsEl.querySelector('#btn-select-all');
 
-      const renderGrid = () => {
-        const nums = optionsFor(selTipo.value, 'loan');
+      selTipo.value = state.tipo || 'notebooks';
+      const prefix = (t) => t === 'notebooks' ? 'Notebook' : (t === 'celulares' ? 'Celular' : 'Câmera');
+
+      const setSelectAllUI = () => {
+        const cbs = Array.from(grid.querySelectorAll('input[type="checkbox"]'));
+        const total = cbs.length;
+        const checked = cbs.filter(cb => cb.checked).length;
+        const all = total > 0 && checked === total;
+
+        btnSelectAll.disabled = total === 0;
+        btnSelectAll.textContent = all ? 'Limpar seleção' : 'Selecionar todos';
+        btnNext.disabled = checked === 0;
+      };
+
+      const renderGrid = async () => {
+        btnNext.disabled = true;
+        const disponiveis = await fetchDisponiveis(selTipo.value);
         grid.innerHTML = '';
+
+        // preserva seleção válida
         const selected = new Set(state.itens.map(Number));
-        const prefix = (t) => t === 'notebooks' ? 'Notebook' : (t === 'celulares' ? 'Celular' : 'Câmera');
-        nums.forEach(n => {
+        state.itens = state.itens.filter(n => disponiveis.includes(Number(n)));
+
+        disponiveis.forEach(n => {
           const id = `chk-${selTipo.value}-${n}`;
           const lab = document.createElement('label'); lab.className = 'toggle';
-          const input = document.createElement('input'); input.type = 'checkbox'; input.id = id; input.value = String(n); input.checked = selected.has(n);
+          const input = document.createElement('input'); input.type = 'checkbox';
+          input.id = id; input.value = String(n); input.checked = selected.has(n);
           input.addEventListener('change', () => {
-            state.itens = Array.from(grid.querySelectorAll('input[type="checkbox"]:checked')).map(i => parseInt(i.value, 10));
-            btnNext.disabled = !(state.itens.length > 0);
+            state.itens = Array.from(grid.querySelectorAll('input[type="checkbox"]:checked'))
+              .map(i => parseInt(i.value, 10));
+            setSelectAllUI();
           });
-          lab.appendChild(input); lab.appendChild(document.createTextNode(' ' + prefix(selTipo.value) + ' ' + n));
+          lab.appendChild(input);
+          lab.appendChild(document.createTextNode(` ${prefix(selTipo.value)} ${n}`));
           grid.appendChild(lab);
         });
-        btnNext.disabled = !(state.itens.length > 0);
+
+        // toggle Selecionar todos / Limpar seleção
+        btnSelectAll.disabled = disponiveis.length === 0;
+        btnSelectAll.onclick = () => {
+          const cbs = Array.from(grid.querySelectorAll('input[type="checkbox"]'));
+          const allSelected = cbs.length > 0 && cbs.every(cb => cb.checked);
+
+          if (allSelected) {
+            cbs.forEach(cb => { cb.checked = false; });
+            state.itens = [];
+          } else {
+            cbs.forEach(cb => { cb.checked = true; });
+            state.itens = disponiveis.slice();
+          }
+          setSelectAllUI();
+        };
+
+        setSelectAllUI();
       };
-      selTipo.addEventListener('change', () => { state.tipo = selTipo.value; state.itens = []; renderGrid(); });
+
+      selTipo.addEventListener('change', async () => {
+        state.tipo = selTipo.value;
+        state.itens = [];
+        await renderGrid();
+      });
+
       obs.addEventListener('input', e => { state.obs = String(e.currentTarget.value || '').trim(); });
 
       renderGrid();
     }
+
 
     function updateButtons() {
       btnBack.disabled = (step === 1);
@@ -328,6 +423,19 @@
         obs: state.obs || ''
       };
       try {
+        // Revalidação final
+        const livresAgora = await fetchDisponiveis(state.tipo);
+        const perdidos = state.itens.filter(n => !livresAgora.includes(Number(n)));
+        if (perdidos.length) {
+          await notifyModal({
+            title: 'Itens indisponíveis',
+            text: `Estes itens deixaram de estar livres: ${perdidos.join(', ')}. Atualizei a lista. Selecione novamente.`,
+            type: 'warning'
+          });
+          renderStep3();
+          return;
+        }
+
         const res = await API.loan(state.tipo, state.itens, form);
         const sucesso = res.emprestados || [];
         const jaOcup = res.ocupados || [];
@@ -338,26 +446,29 @@
         await refreshSnapshot();
         await refreshActiveLoans();
 
-        // Objeto base p/ PDF local
-        const movBase = {
-          tipo: 'emprestimo',
-          categoria: state.categoria,
-          nome: state.nome,
-          recurso: state.tipo,
-          itens: sucesso,
-          turma: state.turma || '',
-          disciplina: state.disciplina || '',
-          atividade: state.atividade || '',
-          cargoSetor: state.cargoSetor || '',
-          email: state.email || '',
-          obs: state.obs || '',
-          at: new Date().toISOString()
-        };
+        // Fecha o wizard de empréstimo ANTES de abrir o QR (evita duplicações)
+        try { closeEmpModal && closeEmpModal(); } catch (_) { }
 
-        await generateLoanPDF(movBase);
+        // PDF local (download automático) — somente se houve itens emprestados
+        if (sucesso.length) {
+          const movBase = {
+            tipo: 'emprestimo',
+            categoria: state.categoria,
+            nome: state.nome,
+            recurso: state.tipo,
+            itens: sucesso,
+            turma: state.turma || '',
+            disciplina: state.disciplina || '',
+            atividade: state.atividade || '',
+            cargoSetor: state.cargoSetor || '',
+            email: state.email || '',
+            obs: state.obs || '',
+            at: new Date().toISOString()
+          };
+          await generateLoanPDF(movBase);
+        }
 
-        // Link relatório (servidor retorna URL ABSOLUTA via format=json)
-        // Incluímos os dados do solicitante na query (viewer gera o PDF no celular)
+        // URL absoluta para QR (format=json)
         let reportURL = '#';
         try {
           const params = {
@@ -366,7 +477,7 @@
             rec: state.tipo,
             itens: Array.isArray(sucesso) ? sucesso.join(',') : '',
             req_id: reqId || '',
-            // extras para o viewer:
+            // extras p/ viewer:
             cat: state.categoria || '',
             nome: state.nome || '',
             turma: state.turma || '',
@@ -382,10 +493,7 @@
           reportURL = resp?.url || '#';
         } catch (e) {
           console.warn('[index.js] relatorioURL json fallback:', e);
-          reportURL = '#';
         }
-
-
 
         // Modal QR + botão baixar PDF
         await showQRCodeModal({
@@ -393,8 +501,25 @@
           title: 'Comprovante de Empréstimo',
           subtitle: 'Escaneie para abrir o relatório. Ou baixe o PDF agora:',
           onDownload: async () => {
-            if (sucesso.length) await generateLoanPDF(movBase);
-            else await alert('Nenhum item foi emprestado.');
+            if (sucesso.length) {
+              const movBase = {
+                tipo: 'emprestimo',
+                categoria: state.categoria,
+                nome: state.nome,
+                recurso: state.tipo,
+                itens: sucesso,
+                turma: state.turma || '',
+                disciplina: state.disciplina || '',
+                atividade: state.atividade || '',
+                cargoSetor: state.cargoSetor || '',
+                email: state.email || '',
+                obs: state.obs || '',
+                at: new Date().toISOString()
+              };
+              await generateLoanPDF(movBase);
+            } else {
+              await alert('Nenhum item foi emprestado.');
+            }
           }
         });
 
@@ -419,15 +544,15 @@
       updateButtons();
     }
 
-    backdrop.querySelector('.m-back').addEventListener('click', () => goTo(step - 1));
-    backdrop.querySelector('.m-next').addEventListener('click', () => { if (step < 3) goTo(step + 1); else finalize(); });
+    btnBack.addEventListener('click', () => goTo(step - 1));
+    btnNext.addEventListener('click', () => { if (step < 3) goTo(step + 1); else finalize(); });
 
+    (async () => { try { await refreshSnapshot(); } catch (e) { } })();
     goTo(1);
   });
 
   /* ---- Wizard DEVOLVER (novo fluxo por req_id) ---- */
   BTN_ABRIR_DEV?.addEventListener('click', async () => {
-    // Carrega empréstimos ativos agrupados
     let grupos = [];
     try {
       const data = await API.activeLoans();
@@ -442,21 +567,10 @@
     const { backdrop, close } = openModal(`
       <div class="modal" role="dialog" aria-modal="true" aria-labelledby="dev-title">
         <style>
-          .gsel .al-card{
-            cursor:pointer;
-            margin-bottom:8px;
-            position:relative; /* garante contexto p/ qualquer overlay */
-          }
-          .gsel .al-card.selected{
-            box-shadow:0 0 0 3px rgba(14,165,233,.3), var(--shadow);
-            border-color:#0ea5e9
-          }
-          /* 🚫 Desliga tooltip só neste modal (lista de grupos para devolução) */
-          .gsel .al-card .al-tooltip{
-            display:none !important;
-            visibility:hidden !important;
-            pointer-events:none !important;
-          }
+          .gsel .al-card{cursor:pointer;margin-bottom:8px;position:relative}
+          .gsel .al-card.selected{box-shadow:0 0 0 3px rgba(14,165,233,.3), var(--shadow); border-color:#0ea5e9}
+          /* Desliga tooltip só nesta lista para não atrapalhar clique */
+          .gsel .al-card .al-tooltip{display:none !important; visibility:hidden !important; pointer-events:none !important;}
         </style>
         <h3 id="dev-title">Devolver — Passo <span id="dev-step-num">1</span> de 2</h3>
         <div id="dev-steps"></div>
@@ -473,10 +587,7 @@
     const btnNext = backdrop.querySelector('.m-next');
     const stepNum = backdrop.querySelector('#dev-step-num');
 
-    const state = {
-      group: null,      // grupo selecionado
-      itensSel: []      // itens (códigos) escolhidos p/ devolver
-    };
+    const state = { group: null, itensSel: [] };
 
     function renderStep1() {
       stepsEl.innerHTML = `
@@ -492,7 +603,7 @@
         const sing = g.recurso === 'notebooks' ? 'Notebook' : (g.recurso === 'celulares' ? 'Celular' : 'Câmera');
         card.innerHTML = `
           <div class="al-top">
-            <strong>${g.nome || '(sem nome)'}</strong>
+            <strong>${g.nome || '(sem nome)'} </strong>
             <span class="badge cat-${g.categoria || 'na'}">${cap(g.categoria || '—')}</span>
           </div>
           <div class="al-row">
@@ -537,30 +648,62 @@
 
       const grid = stepsEl.querySelector('#dev-grid');
       grid.innerHTML = '';
-      state.itensSel = (g.itens || []).map(it => it.codigo); // por padrão, todos marcados
-      const selectedSet = new Set(state.itensSel);
 
-      (g.itens || []).forEach(it => {
-        const lab = document.createElement('label'); lab.className = 'toggle';
-        const input = document.createElement('input'); input.type = 'checkbox'; input.value = String(it.codigo); input.checked = selectedSet.has(it.codigo);
-        input.addEventListener('change', () => {
-          state.itensSel = Array.from(grid.querySelectorAll('input[type="checkbox"]:checked')).map(i => parseInt(i.value, 10));
-          btnNext.disabled = !(state.itensSel.length > 0);
+      (async () => {
+        const ocupadosAgora = await fetchOcupados(g.recurso);
+        const itensAtivosDoGrupo = (g.itens || [])
+          .map(it => Number(it.codigo))
+          .filter(cod => ocupadosAgora.includes(cod));
+
+        state.itensSel = itensAtivosDoGrupo.slice();
+        const selectedSet = new Set(state.itensSel);
+
+        itensAtivosDoGrupo.forEach(cod => {
+          const lab = document.createElement('label'); lab.className = 'toggle';
+          const input = document.createElement('input'); input.type = 'checkbox';
+          input.value = String(cod); input.checked = selectedSet.has(cod);
+          input.addEventListener('change', () => {
+            state.itensSel = Array.from(grid.querySelectorAll('input[type="checkbox"]:checked')).map(i => parseInt(i.value, 10));
+            btnNext.disabled = !(state.itensSel.length > 0);
+          });
+          lab.appendChild(input);
+          lab.appendChild(document.createTextNode(` ${sing} ${cod}`));
+          grid.appendChild(lab);
         });
-        lab.appendChild(input);
-        lab.appendChild(document.createTextNode(` ${sing} ${it.codigo}${it.patrimonio ? ` — Patrimônio ${it.patrimonio}` : ''}`));
-        grid.appendChild(lab);
-      });
+
+        btnNext.disabled = !(state.itensSel.length > 0);
+
+        if (!itensAtivosDoGrupo.length) {
+          await notifyModal({
+            title: 'Nada a devolver',
+            text: 'Todos os itens deste pedido já foram devolvidos.',
+            type: 'info'
+          });
+          btnBack.click();
+        }
+      })();
 
       btnBack.disabled = false;
       btnNext.textContent = 'Confirmar devolução';
-      btnNext.disabled = !(state.itensSel.length > 0);
     }
 
     async function finalize() {
       const g = state.group;
       const codigos = state.itensSel.slice();
       try {
+        // Revalidação final
+        const ocupadosAgora = await fetchOcupados(g.recurso);
+        const invalidos = state.itensSel.filter(n => !ocupadosAgora.includes(Number(n)));
+        if (invalidos.length) {
+          await notifyModal({
+            title: 'Itens já livres',
+            text: `Estes itens já não estão mais ocupados: ${invalidos.join(', ')}. Atualizei a lista.`,
+            type: 'warning'
+          });
+          renderStep2();
+          return;
+        }
+
         const res = await API.devolver(g.recurso, codigos);
         const devolvidos = res.devolvidos || [];
         const ignorados = res.ja_livres || [];
@@ -570,25 +713,29 @@
         await refreshSnapshot();
         await refreshActiveLoans();
 
-        // Objeto p/ PDF
-        const mov = {
-          recurso: g.recurso,
-          itens: devolvidos,
-          categoria: g.categoria,
-          nome: g.nome,
-          turma: g.turma || '',
-          disciplina: g.disciplina || '',
-          atividade: g.atividade || '',
-          cargoSetor: g.cargo_setor || '',
-          email: g.email || '',
-          obs: g.obs || '',
-          retirada_at: g.retirada_at,
-          at
-        };
+        // Fecha o wizard de devolução ANTES do QR (evita duplicações/erros)
+        try { close && close(); } catch (_) { }
 
-        await generateReturnPDF(mov);
+        // PDF local (download automático) — somente se houve devoluções
+        if (devolvidos.length) {
+          const mov = {
+            recurso: g.recurso,
+            itens: devolvidos,
+            categoria: g.categoria,
+            nome: g.nome,
+            turma: g.turma || '',
+            disciplina: g.disciplina || '',
+            atividade: g.atividade || '',
+            cargoSetor: g.cargo_setor || '',
+            email: g.email || '',
+            obs: g.obs || '',
+            retirada_at: g.retirada_at,
+            at
+          };
+          await generateReturnPDF(mov);
+        }
 
-        // Link relatório (servidor retorna URL ABSOLUTA via format=json)
+        // URL absoluta para QR (format=json)
         let reportURL = '#';
         try {
           const params = {
@@ -597,7 +744,6 @@
             rec: g.recurso,
             itens: Array.isArray(devolvidos) ? devolvidos.join(',') : '',
             req_id: g.req_id || '',
-            // extras para o viewer:
             cat: g.categoria || '',
             nome: g.nome || '',
             turma: g.turma || '',
@@ -614,10 +760,7 @@
           reportURL = resp?.url || '#';
         } catch (e) {
           console.warn('[index.js] relatorioURL json fallback (devolucao):', e);
-          reportURL = '#';
         }
-
-
 
         // Modal QR + botão baixar PDF
         await showQRCodeModal({
@@ -625,19 +768,34 @@
           title: 'Comprovante de Devolução',
           subtitle: 'Escaneie para abrir o relatório. Ou baixe o PDF agora:',
           onDownload: async () => {
-            if (devolvidos.length) await generateReturnPDF(mov);
-            else await alert('Nenhum item foi marcado como devolvido.');
+            if (devolvidos.length) {
+              const mov = {
+                recurso: g.recurso,
+                itens: devolvidos,
+                categoria: g.categoria,
+                nome: g.nome,
+                turma: g.turma || '',
+                disciplina: g.disciplina || '',
+                atividade: g.atividade || '',
+                cargoSetor: g.cargo_setor || '',
+                email: g.email || '',
+                obs: g.obs || '',
+                retirada_at: g.retirada_at,
+                at
+              };
+              await generateReturnPDF(mov);
+            } else {
+              await alert('Nenhum item foi marcado como devolvido.');
+            }
           }
         });
 
-        // Mensagem final
         const total = (g.itens || []).length;
         let msg = [];
         if (devolvidos.length) msg.push(`Devolvidos: ${devolvidos.join(', ')}`);
         if (ignorados.length) msg.push(`Ignorados (já livres): ${ignorados.join(', ')}`);
         if (devolvidos.length === total) msg.push('Pedido encerrado ✔️');
         alert(msg.join('\n') || 'Nada a registrar.');
-        close();
       } catch (e) {
         console.error('[index.js] devolver erro:', e);
         alert('Falha ao registrar devolução no servidor.');
