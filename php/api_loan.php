@@ -1,8 +1,19 @@
 <?php
-require __DIR__.'/config.php';
+declare(strict_types=1);
+
+require_once __DIR__ . '/config.php';
 header('Content-Type: application/json; charset=utf-8');
 
-/** Gera UUID v4 em texto */
+// Liga erros do PDO (se já não estiver no config)
+try {
+  if ($pdo instanceof PDO) {
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+  }
+} catch (Throwable $e) {
+  // segue o baile; config.php já deve ter setado isso
+}
+
+// ===== util =====
 function uuidv4(): string {
   $data = random_bytes(16);
   $data[6] = chr((ord($data[6]) & 0x0f) | 0x40);
@@ -10,161 +21,149 @@ function uuidv4(): string {
   return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($data), 4));
 }
 
-$input   = json_decode(file_get_contents('php://input'), true);
+// NADA de tableName() aqui — ela já vem do config.php
+
+// log simples para debug emergencial
+function log_debug(string $msg): void {
+  @file_put_contents(__DIR__ . '/_loan_debug.log', '['.date('c')."] ".$msg."\n", FILE_APPEND);
+}
+
+// ===== input =====
+$raw = file_get_contents('php://input') ?: '';
+$input = json_decode($raw, true);
+if (!$input || !is_array($input)) {
+  // fallback: talvez veio como form-encoded
+  if (!empty($_POST)) {
+    $input = $_POST;
+  }
+}
+
 $recurso = $input['recurso'] ?? '';
 $codigos = $input['codigos'] ?? [];
 $form    = $input['form']    ?? [];
 
-// Opcional: submission_id para anti-duplo-envio (se o front enviar)
-$submissionId = $form['submission_id'] ?? null;
-
 try {
+  if (!$recurso) throw new Exception('recurso não informado');
+  if (!$codigos || !is_array($codigos)) throw new Exception('Lista de códigos vazia/ inválida');
+
+  // usa a tableName() do config.php
   $table = tableName($recurso);
-  if (!$codigos || !is_array($codigos)) {
-    throw new Exception('Lista de códigos vazia');
+
+  // Normaliza campos do formulário
+  $categoria   = $form['categoria']   ?? null;
+  $nome        = $form['nome']        ?? null;
+  $turma       = $form['turma']       ?? null;
+  $disciplina  = $form['disciplina']  ?? null;
+  $atividade   = $form['atividade']   ?? null;
+  $cargo_setor = $form['cargoSetor']  ?? ($form['cargo_setor'] ?? null);
+  $email       = $form['email']       ?? null;
+  $obs         = $form['obs']         ?? null;
+
+  // Validação rápida
+  if (!$categoria || !$nome) {
+    throw new Exception('Campos obrigatórios ausentes (categoria/nome).');
+  }
+
+  // Checa disponibilidade atual (anti-stale)
+  $codigos = array_values(array_map('intval', $codigos));
+  $place = implode(',', array_fill(0, count($codigos), '?'));
+  $stmt  = $pdo->prepare("SELECT codigo, status, manutencao FROM `$table` WHERE codigo IN ($place)");
+  $stmt->execute($codigos);
+  $map = [];
+  while ($r = $stmt->fetch(PDO::FETCH_ASSOC)) {
+    $map[(int)$r['codigo']] = $r;
+  }
+
+  $ok = []; $ocupado = []; $manut = []; $inexistente = [];
+  foreach ($codigos as $codigo) {
+    if (!isset($map[$codigo])) { $inexistente[] = $codigo; continue; }
+    if ((int)$map[$codigo]['manutencao'] === 1) { $manut[] = $codigo; continue; }
+    if ($map[$codigo]['status'] !== 'disponivel') { $ocupado[] = $codigo; continue; }
+    $ok[] = $codigo;
+  }
+
+  if (!$ok) {
+    echo json_encode([
+      'ok'           => true,
+      'emprestados'  => [],
+      'ocupados'     => array_map('intval', $ocupado),
+      'manutencao'   => array_map('intval', $manut),
+      'inexistentes' => array_map('intval', $inexistente)
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
   }
 
   $pdo->beginTransaction();
 
-  // --- (A) DEDUPLICAÇÃO POR submission_id (janela de 60s) -------------------
-  // Só funciona se o front enviar submission_id
-  if ($submissionId) {
-    try {
-      $stmt = $pdo->prepare("
-        SELECT ea.req_id
-        FROM emprestimos_ativos ea
-        WHERE ea.submission_id = ?
-          AND ea.created_at >= (NOW() - INTERVAL 60 SECOND)
-        ORDER BY ea.id DESC
-        LIMIT 1
-      ");
-      $stmt->execute([$submissionId]);
-      $dup = $stmt->fetch(PDO::FETCH_ASSOC);
-      if ($dup) {
-        // Já processado recentemente — evita duplicar.
-        $pdo->commit();
-        echo json_encode([
-          'ok'          => true,
-          'duplicado'   => true,
-          'req_id'      => $dup['req_id'],
-          'emprestados' => [],
-          'ocupados'    => [],
-          'manutencao'  => [],
-          'inexistentes'=> []
-        ], JSON_UNESCAPED_UNICODE);
-        exit;
-      }
-    } catch (\Throwable $e) {
-      // Se as tabelas de ativos ainda não existem, apenas segue o fluxo sem dedupe por submission_id
-      // (não quebra funcionamento atual)
+  // 1) cria cabeçalho do empréstimo (um por operação, não por item)
+  $req_id = uuidv4();
+  $insCab = $pdo->prepare("
+    INSERT INTO emprestimos_ativos
+      (req_id, categoria, nome, turma, disciplina, atividade, cargo_setor, email, obs, recurso, retirada_at, payload)
+    VALUES
+      (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)
+  ");
+  $payload = json_encode($form, JSON_UNESCAPED_UNICODE);
+  $insCab->execute([
+    $req_id, $categoria, $nome, $turma, $disciplina, $atividade, $cargo_setor, $email, $obs, $recurso, $payload
+  ]);
+  $emprestimo_id = (int)$pdo->lastInsertId();
+
+  // 2) marca itens como ocupados
+  $upd = $pdo->prepare("UPDATE `$table` SET status='ocupado', updated_at=NOW() WHERE codigo=? AND status='disponivel' AND manutencao=0");
+  foreach ($ok as $codigo) {
+    $upd->execute([$codigo]);
+    if ($upd->rowCount() !== 1) {
+      // alguém pegou no meio do caminho — vai para ocupado (e sai de ok)
+      $ocupado[] = $codigo;
     }
   }
+  // remove da lista final os que falharam aqui
+  $ok = array_values(array_diff($ok, $ocupado));
 
-  // --- (B) TROCA DE ESTADO ITEM A ITEM --------------------------------------
-  $sqlUpd = "UPDATE `$table` SET status='ocupado', updated_at=NOW()
-             WHERE codigo=? AND status='disponivel' AND manutencao=0";
-  $upd = $pdo->prepare($sqlUpd);
-
-  $ok = []; $ocupado = []; $manut = []; $inexistente = [];
-  foreach ($codigos as $codigo) {
-    $sel = $pdo->prepare("SELECT status, manutencao FROM `$table` WHERE codigo=?");
-    $sel->execute([$codigo]);
-    $row = $sel->fetch(PDO::FETCH_ASSOC);
-    if (!$row) { $inexistente[] = (int)$codigo; continue; }
-    if ((int)$row['manutencao'] === 1) { $manut[] = (int)$codigo; continue; }
-    if ($row['status'] !== 'disponivel') { $ocupado[] = (int)$codigo; continue; }
-
-    $upd->execute([$codigo]);
-    if ($upd->rowCount() === 1) $ok[] = (int)$codigo;
-    else $ocupado[] = (int)$codigo;
-  }
-
-  // --- (C) LOG EM MOVIMENTOS + ATIVOS (se houve sucesso) --------------------
-  $req_id = null;
-
+  // 3) itens do empréstimo + log em movimentos
   if ($ok) {
-    $req_id = uuidv4();
-
-    // Campos do formulário (mantidos como já funcionava)
-    $categoria   = $form['categoria']   ?? null;
-    $nome        = $form['nome']        ?? null;
-    $turma       = $form['turma']       ?? null;
-    $disciplina  = $form['disciplina']  ?? null;
-    $atividade   = $form['atividade']   ?? null;
-    $cargo_setor = $form['cargoSetor']  ?? null; // mantido como você já usa
-    $email       = $form['email']       ?? null;
-    $obs         = $form['obs']         ?? null;
-
-    $payload = json_encode($form, JSON_UNESCAPED_UNICODE);
-
-    // 1 registro por item em "movimentos" (mantém comportamento atual)
-    $insMov = $pdo->prepare("
+    $insItem = $pdo->prepare("
+      INSERT INTO emprestimo_itens (emprestimo_id, recurso, codigo, patrimonio)
+      SELECT ?, ?, n.codigo, n.patrimonio FROM `$table` n WHERE n.codigo=?
+    ");
+    $insMov  = $pdo->prepare("
       INSERT INTO movimentos
         (recurso, codigo, tipo, req_id, categoria, nome, turma, disciplina, atividade, cargo_setor, email, obs, payload, retirada_at)
       VALUES
         (?, ?, 'emprestimo', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
     ");
+
     foreach ($ok as $codigo) {
-      $insMov->execute([
-        $recurso, $codigo,
-        $req_id,
-        $categoria, $nome, $turma, $disciplina, $atividade, $cargo_setor, $email, $obs,
-        $payload
-      ]);
+      // item row
+      $insItem->execute([$emprestimo_id, $recurso, $codigo]);
+      // log
+      $insMov->execute([$recurso, $codigo, $req_id, $categoria, $nome, $turma, $disciplina, $atividade, $cargo_setor, $email, $obs, $payload]);
     }
+  }
 
-    // --- (C.1) Persistência também em TABELAS DE ATIVOS ---------------------
-    // Isso alimenta a Home sem depender de "movimentos" (evita cards fantasma).
-    // Se as tabelas ainda não existirem, ignoramos e seguimos (sem quebrar nada).
-    try {
-      // Cabeçalho do empréstimo ativo
-      $insHead = $pdo->prepare("
-        INSERT INTO emprestimos_ativos
-          (req_id, submission_id, categoria, nome, turma, disciplina, atividade, cargo_setor, email, obs)
-        VALUES (?,?,?,?,?,?,?,?,?,?)
-      ");
-      $insHead->execute([
-        $req_id,
-        $submissionId, // pode ser null
-        $categoria, $nome, $turma, $disciplina, $atividade, $cargo_setor, $email, $obs
-      ]);
-      $emprestimo_id = (int)$pdo->lastInsertId();
-
-      // Itens ativos (UNIQUE uq_item_ativo (recurso,codigo) impede duplicar)
-      $insItem = $pdo->prepare("
-        INSERT INTO emprestimo_itens (emprestimo_id, recurso, codigo)
-        VALUES (?,?,?)
-      ");
-      foreach ($ok as $codigo) {
-        try {
-          $insItem->execute([$emprestimo_id, $recurso, $codigo]);
-        } catch (\Throwable $e) {
-          // Se já existia ativo (duplicado), ignoramos este item aqui
-          // (status do item já foi marcado como ocupado logo acima)
-        }
-      }
-    } catch (\Throwable $e) {
-      // Tabelas de ativos inexistentes? Sem problemas. Mantemos o fluxo antigo.
-      // Você pode logar isso se quiser: error_log($e->getMessage());
-    }
+  // 4) Se por algum motivo nenhum item foi ok, apaga cabeçalho
+  if (!$ok) {
+    $pdo->prepare("DELETE FROM emprestimos_ativos WHERE id=?")->execute([$emprestimo_id]);
   }
 
   $pdo->commit();
 
-  // Resposta mantém o formato antigo + agora inclui req_id quando houver
-  $resp = [
-    'ok'           => true,
-    'emprestados'  => $ok,
-    'ocupados'     => $ocupado,
-    'manutencao'   => $manut,
-    'inexistentes' => $inexistente,
-  ];
-  if ($req_id) $resp['req_id'] = $req_id;
-
-  echo json_encode($resp, JSON_UNESCAPED_UNICODE);
+  echo json_encode([
+    'ok'            => true,
+    'req_id'        => $req_id,
+    'emprestimo_id' => $emprestimo_id,
+    'emprestados'   => array_map('intval', $ok),
+    'ocupados'      => array_map('intval', $ocupado),
+    'manutencao'    => array_map('intval', $manut),
+    'inexistentes'  => array_map('intval', $inexistente)
+  ], JSON_UNESCAPED_UNICODE);
 
 } catch (Throwable $e) {
-  if ($pdo->inTransaction()) $pdo->rollBack();
+  if ($pdo instanceof PDO && $pdo->inTransaction()) {
+    $pdo->rollBack();
+  }
+  log_debug('ERRO: '.$e->getMessage().' | RAW='.$raw);
   http_response_code(400);
   echo json_encode(['ok'=>false,'error'=>$e->getMessage()], JSON_UNESCAPED_UNICODE);
 }

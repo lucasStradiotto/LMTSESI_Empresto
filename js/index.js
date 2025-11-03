@@ -8,6 +8,14 @@
 
   let SNAPSHOT = null;
 
+  // UUID v4 simples para idempotência de submissão
+  function genUUID() {
+    if (crypto?.randomUUID) return crypto.randomUUID();
+    // fallback
+    const s4 = () => Math.floor((1 + Math.random()) * 0x10000).toString(16).substring(1);
+    return `${s4()}${s4()}-${s4()}-${s4()}-${s4()}-${s4()}${s4()}${s4()}`;
+  }
+
   async function refreshSnapshot() {
     try {
       const data = await API.snapshot();
@@ -28,17 +36,6 @@
       alert('Falha ao carregar snapshot do servidor.');
     }
   }
-
-  // Coloque no seu index.js (escopo superior, uma vez)
-  function genUUID() {
-    return (crypto?.randomUUID?.() ??
-      'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-        const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
-      })
-    );
-  }
-
 
   // ---------- Empréstimos Ativos (agrupados) ----------
   const elListNote = document.getElementById('al-notebooks');
@@ -107,46 +104,47 @@
     return div;
   }
 
-  // Remove grupos duplicados num intervalo curto (ex.: 60s)
-  // Critério de "igualdade": mesmo recurso + mesmo conjunto de códigos + mesmo nome (opcional)
-  // Mantém o mais recente (retirada_at maior)
+  // Dedupe por janela (para evitar múltiplos cards “fantasmas” muito próximos)
   function dedupeGroups(arr, windowMs = 60_000) {
-    if (!Array.isArray(arr) || arr.length === 0) return arr;
-    // ordena do mais novo pro mais antigo
-    const sorted = [...arr].sort((a, b) => new Date(b.retirada_at) - new Date(a.retirada_at));
+    if (!Array.isArray(arr) || !arr.length) return arr || [];
+    // chave: recurso|nome|categoria|turma|disciplina|atividade
+    const keyOf = (g) => [
+      g.recurso || '', g.nome || '', g.categoria || '',
+      g.turma || '', g.disciplina || '', g.atividade || ''
+    ].join('|');
 
-    const seen = [];
-    const keep = [];
+    const buckets = new Map();
+    arr.forEach(g => {
+      const k = keyOf(g);
+      const list = buckets.get(k) || [];
+      list.push(g);
+      buckets.set(k, list);
+    });
 
-    const makeKey = (g) => {
-      const cods = (g.itens || []).map(it => Number(it.codigo)).sort((x, y) => x - y).join(',');
-      // usa nome se houver (para diferenciar pedidos de pessoas diferentes no mesmo minuto)
-      return `${g.recurso}|${cods}|${(g.nome || '').trim().toLowerCase()}`;
-    };
-
-    for (const g of sorted) {
-      const k = makeKey(g);
-      const t = new Date(g.retirada_at).getTime();
-      const dupe = seen.find(s => s.key === k && Math.abs(t - s.time) <= windowMs);
-      if (!dupe) {
-        keep.push(g);
-        seen.push({ key: k, time: t });
-      }
-    }
-    // volta à ordem original (opcional). Se quiser manter do mais novo ao mais antigo, retorne keep como está.
-    return keep.reverse();
+    const out = [];
+    buckets.forEach(list => {
+      list.sort((a, b) => new Date(b.retirada_at) - new Date(a.retirada_at)); // desc
+      const kept = [];
+      list.forEach(g => {
+        const ts = new Date(g.retirada_at).getTime();
+        const clash = kept.some(h => Math.abs(new Date(h.retirada_at).getTime() - ts) <= windowMs);
+        if (!clash) kept.push(g);
+      });
+      out.push(...kept);
+    });
+    return out;
   }
-
 
   async function refreshActiveLoans() {
     try {
       const data = await API.activeLoans(); // grupos
       const A = data.ativos || { notebooks: [], celulares: [], cameras: [] };
 
-      // NOVO: dedupe de grupos dentro de 60s
-      A.notebooks = dedupeGroups(A.notebooks, 60_000);
-      A.celulares = dedupeGroups(A.celulares, 60_000);
-      A.cameras = dedupeGroups(A.cameras, 60_000);
+      // aplica dedupe por janela
+      const N = dedupeGroups(A.notebooks, 60_000);
+      const C = dedupeGroups(A.celulares, 60_000);
+      const K = dedupeGroups(A.cameras, 60_000);
+
       const render = (el, arr) => {
         if (!el) return;
         el.innerHTML = '';
@@ -157,9 +155,9 @@
         arr.forEach(g => el.appendChild(groupCard(g)));
       };
 
-      render(elListNote, A.notebooks);
-      render(elListCel, A.celulares);
-      render(elListCam, A.cameras);
+      render(elListNote, N);
+      render(elListCel, C);
+      render(elListCam, K);
     } catch (e) {
       console.error('[index.js] ativos erro:', e);
     }
@@ -318,48 +316,45 @@
 
     function renderStep3() {
       stepsEl.innerHTML = `
-    <form id="emp-step3">
-      <div style="display:grid; gap:10px; margin:10px 0 6px">
-        <div style="display:grid; gap:6px">
-          <label>Recurso</label>
-          <select name="tipo" id="emp-tipo" class="inp" required>
-            <option value="notebooks">Notebooks</option>
-            <option value="celulares">Celulares</option>
-            <option value="cameras">Câmeras</option>
-          </select>
-        </div>
+        <form id="emp-step3">
+          <div style="display:grid; gap:10px; margin:10px 0 6px">
+            <div style="display:grid; gap:6px">
+              <label>Recurso</label>
+              <select name="tipo" id="emp-tipo" class="inp" required>
+                <option value="notebooks">Notebooks</option>
+                <option value="celulares">Celulares</option>
+                <option value="cameras">Câmeras</option>
+              </select>
+            </div>
 
-        <div style="display:grid; gap:6px">
-          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px">
-            <label style="margin:0">Itens disponíveis</label>
-            <button type="button" id="btn-select-all" class="btn btn-outline" style="padding:6px 10px">Selecionar todos</button>
+            <div style="display:grid; gap:6px">
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:10px">
+                <label style="margin:0">Itens disponíveis</label>
+                <button type="button" id="btn-select-all" class="btn btn-outline" style="padding:6px 10px">Selecionar todos</button>
+              </div>
+              <div id="emp-grid" class="checks-grid" aria-live="polite"></div>
+              <small style="color:#475569">Aparecem apenas itens livres (não ocupados e não em manutenção). A lista é verificada em tempo real.</small>
+            </div>
+
+            <textarea name="obs" class="inp" placeholder="Observações (opcional)"></textarea>
           </div>
-          <div id="emp-grid" class="checks-grid" aria-live="polite"></div>
-          <small style="color:#475569">Aparecem apenas itens livres (não ocupados e não em manutenção). A lista é verificada em tempo real.</small>
-        </div>
-
-        <textarea name="obs" class="inp" placeholder="Observações (opcional)"></textarea>
-      </div>
-    </form>
-  `;
+        </form>
+      `;
 
       const selTipo = stepsEl.querySelector('#emp-tipo');
       const grid = stepsEl.querySelector('#emp-grid');
       const obs = stepsEl.querySelector('textarea[name="obs"]');
       const btnSelectAll = stepsEl.querySelector('#btn-select-all');
-
       selTipo.value = state.tipo || 'notebooks';
+
       const prefix = (t) => t === 'notebooks' ? 'Notebook' : (t === 'celulares' ? 'Celular' : 'Câmera');
 
-      const setSelectAllUI = () => {
-        const cbs = Array.from(grid.querySelectorAll('input[type="checkbox"]'));
-        const total = cbs.length;
-        const checked = cbs.filter(cb => cb.checked).length;
-        const all = total > 0 && checked === total;
-
+      const setSelectAllUI = (total, marcados) => {
+        if (!btnSelectAll) return;
         btnSelectAll.disabled = total === 0;
+        const all = total > 0 && marcados >= total;
         btnSelectAll.textContent = all ? 'Limpar seleção' : 'Selecionar todos';
-        btnNext.disabled = checked === 0;
+        btnSelectAll.dataset.mode = all ? 'clear' : 'select';
       };
 
       const renderGrid = async () => {
@@ -367,7 +362,6 @@
         const disponiveis = await fetchDisponiveis(selTipo.value);
         grid.innerHTML = '';
 
-        // preserva seleção válida
         const selected = new Set(state.itens.map(Number));
         state.itens = state.itens.filter(n => disponiveis.includes(Number(n)));
 
@@ -377,32 +371,36 @@
           const input = document.createElement('input'); input.type = 'checkbox';
           input.id = id; input.value = String(n); input.checked = selected.has(n);
           input.addEventListener('change', () => {
-            state.itens = Array.from(grid.querySelectorAll('input[type="checkbox"]:checked'))
-              .map(i => parseInt(i.value, 10));
-            setSelectAllUI();
+            state.itens = Array.from(grid.querySelectorAll('input[type="checkbox"]:checked')).map(i => parseInt(i.value, 10));
+            btnNext.disabled = !(state.itens.length > 0);
+            setSelectAllUI(disponiveis.length, state.itens.length);
           });
+
           lab.appendChild(input);
           lab.appendChild(document.createTextNode(` ${prefix(selTipo.value)} ${n}`));
           grid.appendChild(lab);
         });
 
-        // toggle Selecionar todos / Limpar seleção
-        btnSelectAll.disabled = disponiveis.length === 0;
-        btnSelectAll.onclick = () => {
-          const cbs = Array.from(grid.querySelectorAll('input[type="checkbox"]'));
-          const allSelected = cbs.length > 0 && cbs.every(cb => cb.checked);
+        setSelectAllUI(disponiveis.length, state.itens.length);
 
-          if (allSelected) {
-            cbs.forEach(cb => { cb.checked = false; });
-            state.itens = [];
-          } else {
-            cbs.forEach(cb => { cb.checked = true; });
-            state.itens = disponiveis.slice();
-          }
-          setSelectAllUI();
-        };
+        if (btnSelectAll) {
+          btnSelectAll.onclick = () => {
+            const mode = btnSelectAll.dataset.mode || 'select';
+            if (mode === 'select') {
+              // marcar todos
+              grid.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = true);
+              state.itens = disponiveis.slice();
+            } else {
+              // limpar
+              grid.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+              state.itens = [];
+            }
+            btnNext.disabled = !(state.itens.length > 0);
+            setSelectAllUI(disponiveis.length, state.itens.length);
+          };
+        }
 
-        setSelectAllUI();
+        btnNext.disabled = !(state.itens.length > 0);
       };
 
       selTipo.addEventListener('change', async () => {
@@ -416,13 +414,13 @@
       renderGrid();
     }
 
-
     function updateButtons() {
       btnBack.disabled = (step === 1);
       btnNext.textContent = (step === 3) ? 'Confirmar empréstimo' : 'Próximo';
     }
 
     async function finalize() {
+      // form ÚNICO com submission_id (idempotência)
       const form = {
         categoria: state.categoria,
         nome: state.nome,
@@ -431,7 +429,8 @@
         atividade: state.atividade || '',
         cargoSetor: state.cargoSetor || '',
         email: state.email || '',
-        obs: state.obs || ''
+        obs: state.obs || '',
+        submission_id: genUUID()
       };
       try {
         // Revalidação final
@@ -447,19 +446,8 @@
           return;
         }
 
-        const form = {
-          // ...campos já existentes...
-          categoria: state.categoria,
-          nome: state.nome,
-          turma: state.turma || '',
-          disciplina: state.disciplina || '',
-          atividade: state.atividade || '',
-          cargoSetor: state.cargoSetor || '',
-          email: state.email || '',
-          obs: state.obs || '',
-          submission_id: genUUID()   // 🔴 NOVO: evita duplicidades
-        };
-
+        // Anti-duplo clique
+        btnNext.disabled = true;
         const res = await API.loan(state.tipo, state.itens, form);
         const sucesso = res.emprestados || [];
         const jaOcup = res.ocupados || [];
@@ -470,10 +458,7 @@
         await refreshSnapshot();
         await refreshActiveLoans();
 
-        // Fecha o wizard de empréstimo ANTES de abrir o QR (evita duplicações)
-        try { closeEmpModal && closeEmpModal(); } catch (_) { }
-
-        // PDF local (download automático) — somente se houve itens emprestados
+        // PDF local (download automático)
         if (sucesso.length) {
           const movBase = {
             tipo: 'emprestimo',
@@ -491,6 +476,9 @@
           };
           await generateLoanPDF(movBase);
         }
+
+        // Fechar modal principal antes do QR
+        closeEmpModal && closeEmpModal();
 
         // URL absoluta para QR (format=json)
         let reportURL = '#';
@@ -556,6 +544,8 @@
       } catch (e) {
         console.error('[index.js] loan erro:', e);
         alert('Falha ao registrar empréstimo no servidor.');
+      } finally {
+        btnNext.disabled = false;
       }
     }
 
@@ -627,7 +617,7 @@
         const sing = g.recurso === 'notebooks' ? 'Notebook' : (g.recurso === 'celulares' ? 'Celular' : 'Câmera');
         card.innerHTML = `
           <div class="al-top">
-            <strong>${g.nome || '(sem nome)'} </strong>
+            <strong>${g.nome || '(sem nome)'}</strong>
             <span class="badge cat-${g.categoria || 'na'}">${cap(g.categoria || '—')}</span>
           </div>
           <div class="al-row">
@@ -728,6 +718,9 @@
           return;
         }
 
+        // Anti-duplo clique
+        btnNext.disabled = true;
+
         const res = await API.devolver(g.recurso, codigos);
         const devolvidos = res.devolvidos || [];
         const ignorados = res.ja_livres || [];
@@ -737,10 +730,7 @@
         await refreshSnapshot();
         await refreshActiveLoans();
 
-        // Fecha o wizard de devolução ANTES do QR (evita duplicações/erros)
-        try { close && close(); } catch (_) { }
-
-        // PDF local (download automático) — somente se houve devoluções
+        // PDF local (download automático)
         if (devolvidos.length) {
           const mov = {
             recurso: g.recurso,
@@ -786,6 +776,9 @@
           console.warn('[index.js] relatorioURL json fallback (devolucao):', e);
         }
 
+        // Fecha modal de devolução ANTES do QR (evita duplicações)
+        close();
+
         // Modal QR + botão baixar PDF
         await showQRCodeModal({
           url: reportURL,
@@ -823,6 +816,8 @@
       } catch (e) {
         console.error('[index.js] devolver erro:', e);
         alert('Falha ao registrar devolução no servidor.');
+      } finally {
+        btnNext.disabled = false;
       }
     }
 

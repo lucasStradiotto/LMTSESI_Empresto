@@ -6,7 +6,8 @@ $DB_USER = 'root';
 $DB_PORT = 3306;
 $DB_PASS = '';
 
-$dsn = "mysql:host=$DB_HOST;dbname=$DB_NAME;charset=utf8mb4";
+// Inclua a porta no DSN se necessário:
+$dsn = "mysql:host=$DB_HOST;port=$DB_PORT;dbname=$DB_NAME;charset=utf8mb4";
 $options = [
   PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
   PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
@@ -14,13 +15,16 @@ $options = [
 ];
 $pdo = new PDO($dsn, $DB_USER, $DB_PASS, $options);
 
-function tableName(string $recurso): string {
-  $map = ['notebooks'=>'notebook','celulares'=>'celular','cameras'=>'camera'];
-  if (!isset($map[$recurso])) throw new InvalidArgumentException('Recurso inválido');
-  return $map[$recurso];
+// Centralize a função aqui e evite redeclarações
+if (!function_exists('tableName')) {
+  function tableName(string $recurso): string {
+    $map = ['notebooks'=>'notebook','celulares'=>'celular','cameras'=>'camera'];
+    if (!isset($map[$recurso])) throw new InvalidArgumentException('Recurso inválido');
+    return $map[$recurso];
+  }
 }
-header('Content-Type: application/json; charset=utf-8');
-// Ex.: IP da máquina no LAN + pasta do projeto
-define('PUBLIC_BASE_URL', 'http://10.117.198.147/LMTSESI_EMPRESTO/');
-// define('PUBLIC_BASE_URL', 'http://10.117.198.147/LMTSESI_EMPRESTO/');
 
+// URL pública base do sistema (use seu IP/host)
+if (!defined('PUBLIC_BASE_URL')) {
+  define('PUBLIC_BASE_URL', 'http://10.117.198.147/LMTSESI_EMPRESTO/');
+}

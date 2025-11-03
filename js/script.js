@@ -30,15 +30,23 @@
 
 
   // ---------------------- Fetch JSON helper ----------------------
+  // SUBSTITUA sua função j() por esta versão “JSON-only”
   async function j(url, options = {}) {
     const r = await fetch(API_BASE + url, {
       headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
       ...options
     });
+
     const ct = r.headers.get('content-type') || '';
-    const parse = ct.includes('application/json') ? r.json() : r.text();
-    const d = await parse;
-    if (!r.ok || (d && d.ok === false)) throw new Error(d?.error || `HTTP ${r.status}`);
+    if (!ct.includes('application/json')) {
+      const preview = (await r.text()).slice(0, 300);
+      throw new Error(`Resposta não-JSON de ${url}. Prévia: ${preview}`);
+    }
+
+    const d = await r.json();
+    if (!r.ok || (d && d.ok === false)) {
+      throw new Error(d?.error || `HTTP ${r.status}`);
+    }
     return d;
   }
 
