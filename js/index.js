@@ -29,6 +29,17 @@
     }
   }
 
+  // Coloque no seu index.js (escopo superior, uma vez)
+  function genUUID() {
+    return (crypto?.randomUUID?.() ??
+      'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+        const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      })
+    );
+  }
+
+
   // ---------- Empréstimos Ativos (agrupados) ----------
   const elListNote = document.getElementById('al-notebooks');
   const elListCel = document.getElementById('al-celulares');
@@ -435,6 +446,19 @@
           renderStep3();
           return;
         }
+
+        const form = {
+          // ...campos já existentes...
+          categoria: state.categoria,
+          nome: state.nome,
+          turma: state.turma || '',
+          disciplina: state.disciplina || '',
+          atividade: state.atividade || '',
+          cargoSetor: state.cargoSetor || '',
+          email: state.email || '',
+          obs: state.obs || '',
+          submission_id: genUUID()   // 🔴 NOVO: evita duplicidades
+        };
 
         const res = await API.loan(state.tipo, state.itens, form);
         const sucesso = res.emprestados || [];
