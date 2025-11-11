@@ -30,25 +30,37 @@
 
 
   // ---------------------- Fetch JSON helper ----------------------
-  // SUBSTITUA sua função j() por esta versão “JSON-only”
   async function j(url, options = {}) {
     const r = await fetch(API_BASE + url, {
       headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
       ...options
     });
 
-    const ct = r.headers.get('content-type') || '';
-    if (!ct.includes('application/json')) {
-      const preview = (await r.text()).slice(0, 300);
-      throw new Error(`Resposta não-JSON de ${url}. Prévia: ${preview}`);
+    const ct = (r.headers.get('content-type') || '').toLowerCase();
+    let data;
+    if (ct.includes('application/json')) {
+      data = await r.json();
+    } else {
+      // fallback: tenta tratar como JSON mesmo se o header veio errado
+      const text = await r.text();
+      const trimmed = text.trim();
+      if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+        try { data = JSON.parse(trimmed); }
+        catch {
+          throw new Error(`Resposta não-JSON de ${url}. Prévia: ${text.slice(0, 180)}`);
+        }
+      } else {
+        throw new Error(`Resposta não-JSON de ${url}. Prévia: ${trimmed.slice(0, 180)}`);
+      }
     }
 
-    const d = await r.json();
-    if (!r.ok || (d && d.ok === false)) {
-      throw new Error(d?.error || `HTTP ${r.status}`);
+    if (!r.ok || (data && data.ok === false)) {
+      const msg = (data && data.error) ? data.error : `HTTP ${r.status}`;
+      throw new Error(msg);
     }
-    return d;
+    return data;
   }
+
 
   // --------------------------- API -------------------------------
   window.API = {

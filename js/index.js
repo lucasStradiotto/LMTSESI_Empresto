@@ -37,6 +37,8 @@
     }
   }
 
+  window.refreshSnapshot = refreshSnapshot;
+
   // ---------- Empréstimos Ativos (agrupados) ----------
   const elListNote = document.getElementById('al-notebooks');
   const elListCel = document.getElementById('al-celulares');
